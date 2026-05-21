@@ -188,6 +188,28 @@ tbody td input:focus, tbody td select:focus { border-color: var(--accent); backg
   .summary-box { min-width: unset; }
 }
 
+/* ── FIXED BOTTOM ACTION BAR ── */
+.fixed-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--paper);
+  border-top: 1.5px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+}
+.fixed-action-bar .btn { flex: 1; max-width: 200px; justify-content: center; }
+
+@media(max-width:480px) {
+  .fixed-action-bar .btn { max-width: 100%; }
+}
+
 /* ── PRINT ── */
 @media print {
   body { background: #fff !important; padding: 0 !important; }
