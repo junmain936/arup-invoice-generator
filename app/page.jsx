@@ -381,7 +381,6 @@ export default function InvoicePage() {
               {t === 'editor' ? '✏️ Editor' : t === 'preview' ? '👁️ Preview' : '🗂️ History'}
             </button>
           ))}
-          <button className="tab" onClick={handlePrint}>🖨️ Print</button>
         </div>
 
         {/* ══ EDITOR TAB ══ */}
@@ -643,14 +642,8 @@ export default function InvoicePage() {
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
-            <div className="btn-row" style={{ marginBottom: 40 }}>
-              <button className="btn btn-primary" onClick={() => handleTabChange('preview')}>👁️ Preview</button>
-              <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
-                {saving ? '⏳ Saving...' : '💾 Save to DB'}
-              </button>
-              <button className="btn btn-outline" onClick={handlePrint}>🖨️ Print / PDF</button>
-            </div>
+            {/* bottom spacer for fixed footer */}
+            <div style={{ height: 80 }} />
           </>
         )}
 
@@ -659,14 +652,14 @@ export default function InvoicePage() {
           <>
             <div className="btn-row" style={{ marginBottom: 16 }}>
               <button className="btn btn-outline" onClick={() => setTab('editor')}>← Back</button>
-              <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>{saving ? '⏳ Saving...' : '💾 Save to DB'}</button>
-              <button className="btn btn-outline" onClick={handlePrint}>🖨️ Print / PDF</button>
             </div>
             <div className="card">
               <div className="card-body">
                 <div dangerouslySetInnerHTML={{ __html: printHTML }} />
               </div>
             </div>
+            {/* bottom spacer for fixed footer */}
+            <div style={{ height: 80 }} />
           </>
         )}
 
@@ -711,6 +704,28 @@ export default function InvoicePage() {
               )}
             </div>
           </div>
+        )}
+      </div>
+
+      {/* FIXED BOTTOM ACTION BAR */}
+      <div className="fixed-action-bar no-print">
+        {tab === 'editor' && (
+          <>
+            <button className="btn btn-primary" onClick={() => handleTabChange('preview')}>👁️ Preview</button>
+            <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
+              {saving ? '⏳ Saving...' : '💾 Save to DB'}
+            </button>
+            <button className="btn btn-outline" onClick={handlePrint}>🖨️ Print / PDF</button>
+          </>
+        )}
+        {tab === 'preview' && (
+          <>
+            <button className="btn btn-outline" onClick={() => setTab('editor')}>← Editor</button>
+            <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
+              {saving ? '⏳ Saving...' : '💾 Save to DB'}
+            </button>
+            <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print / PDF</button>
+          </>
         )}
       </div>
 
