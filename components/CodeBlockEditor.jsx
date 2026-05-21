@@ -1,6 +1,5 @@
+'use client'
 import { useState, useRef, useCallback } from "react";
-
-// ─── Parsers ────────────────────────────────────────────────────────────────
 
 function detectLanguage(code) {
   if (/^\s*<(!DOCTYPE|html|head|body)/i.test(code)) return "html";
@@ -16,7 +15,6 @@ function parseCodeIntoBlocks(code) {
   const blocks = [];
 
   if (lang === "html") {
-    // HTML: split by major tags
     const tagPattern = /(<(html|head|body|style|script|div|section|header|footer|main|nav|article)[^>]*>[\s\S]*?<\/\2>)/gi;
     let lastIndex = 0;
     let match;
@@ -25,9 +23,7 @@ function parseCodeIntoBlocks(code) {
     while ((match = regex.exec(code)) !== null) {
       if (match.index > lastIndex) {
         const between = code.slice(lastIndex, match.index).trim();
-        if (between) {
-          blocks.push({ id: idx++, name: `Block_${idx}`, code: between });
-        }
+        if (between) blocks.push({ id: idx++, name: `Block_${idx}`, code: between });
       }
       const tagName = match[2];
       blocks.push({ id: idx++, name: `<${tagName}>`, code: match[0] });
@@ -38,12 +34,10 @@ function parseCodeIntoBlocks(code) {
       if (remaining) blocks.push({ id: idx++, name: `Block_${idx}`, code: remaining });
     }
   } else if (lang === "python") {
-    // Python: split by def/class
     const lines = code.split("\n");
     let current = [];
     let currentName = "Module_Top";
     let idx = 0;
-
     for (const line of lines) {
       const defMatch = line.match(/^(def|class)\s+(\w+)/);
       if (defMatch && current.length > 0) {
@@ -55,25 +49,19 @@ function parseCodeIntoBlocks(code) {
         if (defMatch) currentName = `${defMatch[1]}_${defMatch[2]}`;
       }
     }
-    if (current.length > 0) {
-      blocks.push({ id: idx++, name: currentName, code: current.join("\n") });
-    }
+    if (current.length > 0) blocks.push({ id: idx++, name: currentName, code: current.join("\n") });
   } else {
-    // JS/JSX/TS: split by function/class/const arrow fn
     const lines = code.split("\n");
     let current = [];
     let currentName = "Top_Level";
     let depth = 0;
     let idx = 0;
     let inBlock = false;
-
     for (const line of lines) {
       const opens = (line.match(/\{/g) || []).length;
       const closes = (line.match(/\}/g) || []).length;
       depth += opens - closes;
-
       const fnMatch = line.match(/^(?:export\s+)?(?:async\s+)?(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(|class\s+(\w+))/);
-
       if (fnMatch && depth <= 1 && current.length > 0) {
         blocks.push({ id: idx++, name: currentName, code: current.join("\n").trim() });
         current = [line];
@@ -86,7 +74,6 @@ function parseCodeIntoBlocks(code) {
           inBlock = true;
         }
       }
-
       if (depth === 0 && inBlock && current.length > 3) {
         blocks.push({ id: idx++, name: currentName, code: current.join("\n").trim() });
         current = [];
@@ -99,25 +86,21 @@ function parseCodeIntoBlocks(code) {
     }
   }
 
-  // Fallback: if only 1 block or none, split by blank lines / size
   if (blocks.length <= 1) {
     const parts = code.split(/\n{2,}/);
     return parts
       .map((part, i) => ({ id: i, name: `Block_${i + 1}`, code: part.trim() }))
       .filter((b) => b.code.length > 0);
   }
-
   return blocks;
 }
-
-// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function CodeBlockEditor() {
   const [blocks, setBlocks] = useState([]);
   const [search, setSearch] = useState("");
   const [copied, setCopied] = useState(false);
   const [pasteVal, setPasteVal] = useState("");
-  const [view, setView] = useState("upload"); // "upload" | "editor"
+  const [view, setView] = useState("upload");
   const [fullCode, setFullCode] = useState("");
   const [updated, setUpdated] = useState(false);
   const fileRef = useRef();
@@ -165,15 +148,21 @@ export default function CodeBlockEditor() {
     setBlocks((prev) => prev.filter((b) => b.id !== id));
   };
 
+  // ── Merge with block names as comments ──
+  const buildFullCode = (blks) => {
+    return blks.map((b) => `// ── ${b.name} ──\n${b.code}`).join("\n\n");
+  };
+
   const handleUpdate = () => {
-    const merged = blocks.map((b) => b.code).join("\n\n");
+    const merged = buildFullCode(blocks);
     setFullCode(merged);
     setUpdated(true);
     setTimeout(() => setUpdated(false), 2000);
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(fullCode);
+    const merged = buildFullCode(blocks);
+    navigator.clipboard.writeText(merged);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -182,7 +171,7 @@ export default function CodeBlockEditor() {
     b.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Upload Screen ──────────────────────────────────────────────────────────
+  // ── Upload Screen ──
   if (view === "upload") {
     return (
       <div style={styles.root}>
@@ -190,7 +179,6 @@ export default function CodeBlockEditor() {
           <div style={styles.logo}>⬡</div>
           <h1 style={styles.title}>Code Block Editor</h1>
           <p style={styles.sub}>Upload a file or paste code to split it into editable blocks</p>
-
           <div
             style={styles.dropZone}
             onClick={() => fileRef.current.click()}
@@ -210,9 +198,7 @@ export default function CodeBlockEditor() {
             <p style={styles.dropSub}>Supports JS, JSX, TS, Python, HTML, CSS, PHP, Go…</p>
             <input ref={fileRef} type="file" style={{ display: "none" }} onChange={handleFile} />
           </div>
-
           <div style={styles.divider}><span style={styles.dividerText}>or paste code</span></div>
-
           <textarea
             style={styles.pasteBox}
             placeholder="// Paste your code here..."
@@ -220,7 +206,6 @@ export default function CodeBlockEditor() {
             onChange={(e) => setPasteVal(e.target.value)}
             spellCheck={false}
           />
-
           <button
             style={{ ...styles.btn, opacity: pasteVal.trim() ? 1 : 0.4 }}
             disabled={!pasteVal.trim()}
@@ -233,10 +218,9 @@ export default function CodeBlockEditor() {
     );
   }
 
-  // ── Editor Screen ──────────────────────────────────────────────────────────
+  // ── Editor Screen ──
   return (
     <div style={styles.editorRoot}>
-      {/* Top Bar */}
       <div style={styles.topBar}>
         <button style={styles.backBtn} onClick={() => { setView("upload"); setPasteVal(""); setBlocks([]); }}>
           ← Back
@@ -249,45 +233,35 @@ export default function CodeBlockEditor() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {search && (
-            <button style={styles.clearSearch} onClick={() => setSearch("")}>✕</button>
-          )}
+          {search && <button style={styles.clearSearch} onClick={() => setSearch("")}>✕</button>}
         </div>
         <div style={styles.blockCount}>{filtered.length} block{filtered.length !== 1 ? "s" : ""}</div>
       </div>
 
-      {/* Blocks Area */}
       <div style={styles.blocksArea}>
         {filtered.length === 0 ? (
           <div style={styles.noMatch}>No blocks match "{search}"</div>
         ) : (
-          <>
-            {filtered.map((block, idx) => (
-              <div key={block.id}>
-                <BlockCard
-                  block={block}
-                  index={idx + 1}
-                  total={filtered.length}
-                  onChange={handleBlockChange}
-                  onNameChange={handleNameChange}
-                  onDelete={handleDeleteBlock}
-                />
-                {/* Add Block button after each block */}
-                <div style={styles.addBlockRow}>
-                  <button
-                    style={styles.addBlockBtn}
-                    onClick={() => handleAddBlock(block.id)}
-                  >
-                    <span style={styles.addIcon}>＋</span> Add Block here
-                  </button>
-                </div>
+          filtered.map((block, idx) => (
+            <div key={block.id}>
+              <BlockCard
+                block={block}
+                index={idx + 1}
+                total={filtered.length}
+                onChange={handleBlockChange}
+                onNameChange={handleNameChange}
+                onDelete={handleDeleteBlock}
+              />
+              <div style={styles.addBlockRow}>
+                <button style={styles.addBlockBtn} onClick={() => handleAddBlock(block.id)}>
+                  <span style={styles.addIcon}>＋</span> Add Block here
+                </button>
               </div>
-            ))}
-          </>
+            </div>
+          ))
         )}
       </div>
 
-      {/* Bottom Fixed Bar */}
       <div style={styles.bottomBar}>
         <div style={styles.bottomLeft}>
           <span style={styles.fileTag}>📝 {blocks.length} blocks total</span>
@@ -296,23 +270,18 @@ export default function CodeBlockEditor() {
           <button style={styles.updateBtn} onClick={handleUpdate}>
             {updated ? "✓ Updated!" : "⟳ Update Full Code"}
           </button>
-          {fullCode && (
-            <button style={styles.copyBtn} onClick={handleCopy}>
-              {copied ? "✓ Copied!" : "⎘ Copy Full Code"}
-            </button>
-          )}
+          <button style={styles.copyBtn} onClick={handleCopy}>
+            {copied ? "✓ Copied!" : "⎘ Copy Full Code"}
+          </button>
         </div>
       </div>
 
-      {/* Full Code Preview (shows after update) */}
-      {fullCode && updated === false && view === "editor" && (
+      {fullCode && updated && (
         <FullCodePanel code={fullCode} onCopy={handleCopy} copied={copied} />
       )}
     </div>
   );
 }
-
-// ─── Block Card ───────────────────────────────────────────────────────────────
 
 function BlockCard({ block, index, onChange, onNameChange, onDelete }) {
   const [editing, setEditing] = useState(false);
@@ -348,16 +317,11 @@ function BlockCard({ block, index, onChange, onNameChange, onDelete }) {
           >
             {editing ? "✓ Done" : "✎ Edit"}
           </button>
-          <button
-            style={styles.deleteBtn}
-            onClick={() => onDelete(block.id)}
-            title="Delete block"
-          >
+          <button style={styles.deleteBtn} onClick={() => onDelete(block.id)} title="Delete block">
             🗑
           </button>
         </div>
       </div>
-
       <textarea
         style={{
           ...styles.codeBox,
@@ -373,8 +337,6 @@ function BlockCard({ block, index, onChange, onNameChange, onDelete }) {
   );
 }
 
-// ─── Full Code Panel ─────────────────────────────────────────────────────────
-
 function FullCodePanel({ code, onCopy, copied }) {
   const lines = code.split("\n").length;
   return (
@@ -386,22 +348,15 @@ function FullCodePanel({ code, onCopy, copied }) {
           {copied ? "✓ Copied!" : "⎘ Copy"}
         </button>
       </div>
-      <textarea
-        style={styles.fullCode}
-        value={code}
-        readOnly
-        spellCheck={false}
-      />
+      <textarea style={styles.fullCode} value={code} readOnly spellCheck={false} />
     </div>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = {
   root: {
     minHeight: "100vh",
-    background: "#0d0d0f",
+    background: "#f0f2f5",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -409,13 +364,13 @@ const styles = {
     padding: "20px",
   },
   uploadCard: {
-    background: "#141418",
-    border: "1px solid #2a2a35",
+    background: "#ffffff",
+    border: "1.5px solid #d0d5dd",
     borderRadius: "16px",
     padding: "40px",
     maxWidth: "520px",
     width: "100%",
-    boxShadow: "0 0 60px rgba(99,102,241,0.08)",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
   },
   logo: {
     fontSize: "32px",
@@ -426,7 +381,7 @@ const styles = {
   title: {
     margin: "0 0 8px",
     textAlign: "center",
-    color: "#f0f0ff",
+    color: "#1a1a2e",
     fontSize: "22px",
     fontWeight: "700",
     letterSpacing: "-0.5px",
@@ -434,23 +389,22 @@ const styles = {
   sub: {
     margin: "0 0 28px",
     textAlign: "center",
-    color: "#666",
+    color: "#6b7280",
     fontSize: "13px",
   },
   dropZone: {
-    border: "2px dashed #2a2a40",
+    border: "2px dashed #c7d0e0",
     borderRadius: "12px",
     padding: "32px 20px",
     textAlign: "center",
     cursor: "pointer",
-    transition: "border-color 0.2s",
-    background: "#0d0d13",
+    background: "#f8f9fc",
     marginBottom: "20px",
   },
   dropIcon: { fontSize: "32px", marginBottom: "12px" },
-  dropText: { color: "#aaa", fontSize: "14px", margin: "0 0 6px" },
+  dropText: { color: "#374151", fontSize: "14px", margin: "0 0 6px" },
   browse: { color: "#6366f1", textDecoration: "underline" },
-  dropSub: { color: "#444", fontSize: "12px", margin: 0 },
+  dropSub: { color: "#9ca3af", fontSize: "12px", margin: 0 },
   divider: {
     display: "flex",
     alignItems: "center",
@@ -458,20 +412,20 @@ const styles = {
     margin: "20px 0",
   },
   dividerText: {
-    color: "#444",
+    color: "#9ca3af",
     fontSize: "12px",
     whiteSpace: "nowrap",
-    background: "#141418",
+    background: "#ffffff",
     padding: "0 8px",
     margin: "0 auto",
   },
   pasteBox: {
     width: "100%",
     minHeight: "160px",
-    background: "#0d0d13",
-    border: "1px solid #2a2a35",
+    background: "#f8f9fc",
+    border: "1.5px solid #d0d5dd",
     borderRadius: "10px",
-    color: "#c0c0e0",
+    color: "#1f2937",
     fontFamily: "'JetBrains Mono', monospace",
     fontSize: "12px",
     padding: "14px",
@@ -494,12 +448,10 @@ const styles = {
     cursor: "pointer",
     fontFamily: "'JetBrains Mono', monospace",
     letterSpacing: "0.5px",
-    transition: "transform 0.1s",
   },
-  // Editor root
   editorRoot: {
     minHeight: "100vh",
-    background: "#0d0d0f",
+    background: "#f0f2f5",
     display: "flex",
     flexDirection: "column",
     fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
@@ -509,18 +461,18 @@ const styles = {
     position: "sticky",
     top: 0,
     zIndex: 100,
-    background: "#101014",
-    borderBottom: "1px solid #1e1e28",
+    background: "#ffffff",
+    borderBottom: "1.5px solid #e5e7eb",
     padding: "12px 20px",
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
   },
   backBtn: {
     background: "transparent",
-    border: "1px solid #2a2a38",
-    color: "#888",
+    border: "1.5px solid #d1d5db",
+    color: "#6b7280",
     padding: "7px 14px",
     borderRadius: "8px",
     cursor: "pointer",
@@ -542,10 +494,10 @@ const styles = {
   },
   searchInput: {
     width: "100%",
-    background: "#0d0d13",
-    border: "1px solid #2a2a38",
+    background: "#f8f9fc",
+    border: "1.5px solid #d1d5db",
     borderRadius: "8px",
-    color: "#d0d0f0",
+    color: "#1f2937",
     fontFamily: "'JetBrains Mono', monospace",
     fontSize: "13px",
     padding: "8px 36px 8px 36px",
@@ -557,13 +509,13 @@ const styles = {
     right: "10px",
     background: "transparent",
     border: "none",
-    color: "#555",
+    color: "#9ca3af",
     cursor: "pointer",
     fontSize: "12px",
     padding: "2px 4px",
   },
   blockCount: {
-    color: "#555",
+    color: "#9ca3af",
     fontSize: "12px",
     whiteSpace: "nowrap",
     minWidth: "70px",
@@ -578,25 +530,24 @@ const styles = {
   },
   noMatch: {
     textAlign: "center",
-    color: "#444",
+    color: "#9ca3af",
     padding: "60px 0",
     fontSize: "14px",
   },
-  // Card
   card: {
-    background: "#111116",
-    border: "1px solid #1e1e2c",
+    background: "#ffffff",
+    border: "2px solid #6366f1",
     borderRadius: "12px",
     overflow: "hidden",
-    transition: "border-color 0.2s",
+    boxShadow: "0 2px 8px rgba(99,102,241,0.08)",
   },
   cardHeader: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     padding: "10px 14px",
-    borderBottom: "1px solid #1a1a24",
-    background: "#0e0e14",
+    borderBottom: "1.5px solid #e5e7eb",
+    background: "#f5f3ff",
   },
   cardLeft: {
     display: "flex",
@@ -611,21 +562,22 @@ const styles = {
     minWidth: "28px",
   },
   blockName: {
-    color: "#a0a0c0",
+    color: "#4338ca",
     fontSize: "12px",
+    fontWeight: "600",
     cursor: "pointer",
     maxWidth: "200px",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-    borderBottom: "1px dashed #333",
+    borderBottom: "1px dashed #a5b4fc",
     paddingBottom: "1px",
   },
   nameInput: {
-    background: "#0a0a12",
-    border: "1px solid #6366f1",
+    background: "#fff",
+    border: "1.5px solid #6366f1",
     borderRadius: "4px",
-    color: "#d0d0f0",
+    color: "#1f2937",
     fontFamily: "'JetBrains Mono', monospace",
     fontSize: "12px",
     padding: "2px 8px",
@@ -633,14 +585,14 @@ const styles = {
     maxWidth: "180px",
   },
   lineCount: {
-    color: "#333",
+    color: "#9ca3af",
     fontSize: "10px",
     whiteSpace: "nowrap",
   },
   editToggle: {
     background: "transparent",
-    border: "1px solid #2a2a38",
-    color: "#666",
+    border: "1.5px solid #d1d5db",
+    color: "#6b7280",
     padding: "5px 12px",
     borderRadius: "6px",
     cursor: "pointer",
@@ -656,10 +608,10 @@ const styles = {
   },
   codeBox: {
     width: "100%",
-    background: "#0a0a10",
+    background: "#fafafa",
     border: "none",
-    borderTop: "1px solid #141420",
-    color: "#b0b0d0",
+    borderTop: "1px solid #e5e7eb",
+    color: "#374151",
     fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
     fontSize: "12px",
     padding: "14px",
@@ -670,33 +622,31 @@ const styles = {
     display: "block",
     overflow: "auto",
     cursor: "default",
-    transition: "background 0.2s, border-color 0.2s",
     minHeight: "80px",
   },
   codeBoxEditing: {
-    background: "#0d0d18",
-    borderTop: "1px solid #6366f155",
+    background: "#fffbeb",
+    borderTop: "1px solid #fbbf24",
     cursor: "text",
-    color: "#d0d0f0",
+    color: "#1f2937",
   },
-  // Bottom bar
   bottomBar: {
     position: "fixed",
     bottom: 0,
     left: 0,
     right: 0,
-    background: "#101014",
-    borderTop: "1px solid #1e1e28",
+    background: "#ffffff",
+    borderTop: "1.5px solid #e5e7eb",
     padding: "12px 20px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     zIndex: 200,
-    boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+    boxShadow: "0 -2px 12px rgba(0,0,0,0.06)",
   },
   bottomLeft: { display: "flex", alignItems: "center", gap: "10px" },
   bottomRight: { display: "flex", alignItems: "center", gap: "10px" },
-  fileTag: { color: "#444", fontSize: "12px" },
+  fileTag: { color: "#9ca3af", fontSize: "12px" },
   updateBtn: {
     background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
     border: "none",
@@ -709,16 +659,15 @@ const styles = {
     fontWeight: "700",
   },
   copyBtn: {
-    background: "#1a1a28",
-    border: "1px solid #2a2a40",
-    color: "#a0a0c8",
+    background: "#f3f4f6",
+    border: "1.5px solid #d1d5db",
+    color: "#374151",
     padding: "9px 18px",
     borderRadius: "8px",
     cursor: "pointer",
     fontSize: "12px",
     fontFamily: "'JetBrains Mono', monospace",
   },
-  // Add block row
   addBlockRow: {
     display: "flex",
     justifyContent: "center",
@@ -726,8 +675,8 @@ const styles = {
   },
   addBlockBtn: {
     background: "transparent",
-    border: "1px dashed #2a2a40",
-    color: "#4a4a6a",
+    border: "1.5px dashed #c7d2fe",
+    color: "#818cf8",
     borderRadius: "8px",
     padding: "6px 20px",
     fontSize: "11px",
@@ -736,30 +685,23 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "6px",
-    transition: "all 0.15s",
     letterSpacing: "0.3px",
   },
-  addIcon: {
-    fontSize: "14px",
-    color: "#5a5a8a",
-    lineHeight: 1,
-  },
+  addIcon: { fontSize: "14px", color: "#818cf8", lineHeight: 1 },
   deleteBtn: {
     background: "transparent",
-    border: "1px solid #2a2a38",
-    color: "#555",
+    border: "1.5px solid #fca5a5",
+    color: "#ef4444",
     borderRadius: "6px",
     padding: "5px 8px",
     cursor: "pointer",
     fontSize: "12px",
     lineHeight: 1,
-    transition: "all 0.15s",
   },
-  // Full panel
   fullPanel: {
     margin: "0 20px 20px",
-    background: "#0a0a12",
-    border: "1px solid #1e1e2c",
+    background: "#ffffff",
+    border: "1.5px solid #d1d5db",
     borderRadius: "12px",
     overflow: "hidden",
   },
@@ -768,18 +710,18 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     padding: "10px 14px",
-    background: "#0e0e16",
-    borderBottom: "1px solid #1a1a24",
+    background: "#f9fafb",
+    borderBottom: "1px solid #e5e7eb",
   },
-  fullTitle: { color: "#8080b0", fontSize: "12px", flex: 1 },
-  fullMeta: { color: "#444", fontSize: "11px" },
+  fullTitle: { color: "#6366f1", fontSize: "12px", flex: 1, fontWeight: "600" },
+  fullMeta: { color: "#9ca3af", fontSize: "11px" },
   fullCode: {
     width: "100%",
     minHeight: "200px",
     maxHeight: "400px",
     background: "transparent",
     border: "none",
-    color: "#a0a0c0",
+    color: "#374151",
     fontFamily: "'JetBrains Mono', monospace",
     fontSize: "12px",
     padding: "14px",
