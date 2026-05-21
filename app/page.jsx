@@ -1,6 +1,22 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 
+// ── COLLAPSIBLE CARD ──────────────────────────────────────────
+function CollapsibleCard({ icon, title, children, defaultOpen = false, headerExtra }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="card">
+      <div className="card-header card-header-toggle" onClick={() => setOpen(o => !o)}>
+        <span className="icon">{icon}</span>
+        <h2>{title}</h2>
+        {headerExtra && <div onClick={e => e.stopPropagation()} style={{ marginLeft: 'auto' }}>{headerExtra}</div>}
+        <span className={`card-chevron${open ? ' open' : ''}`}>▾</span>
+      </div>
+      {open && <div className="card-body">{children}</div>}
+    </div>
+  )
+}
+
 // ── DEFAULTS ──────────────────────────────────────────────────
 const DEFAULT_BILLED_BY = {
   name: 'M/S Arup Enterprise',
@@ -387,9 +403,7 @@ export default function InvoicePage() {
         {tab === 'editor' && (
           <>
             {/* BILLED BY */}
-            <div className="card">
-              <div className="card-header"><span className="icon">🏢</span><h2>Billed By (Seller)</h2></div>
-              <div className="card-body">
+            <CollapsibleCard icon="🏢" title="Billed By (Seller)">
                 <div className="grid2">
                   <div className="field col-span2">
                     <label>Business Name</label>
@@ -420,13 +434,10 @@ export default function InvoicePage() {
                     <input value={billedBy.bank} onChange={e => setBilledBy(p => ({ ...p, bank: e.target.value }))} />
                   </div>
                 </div>
-              </div>
-            </div>
+            </CollapsibleCard>
 
             {/* INVOICE DETAILS */}
-            <div className="card">
-              <div className="card-header"><span className="icon">📄</span><h2>Invoice Details</h2></div>
-              <div className="card-body">
+            <CollapsibleCard icon="📄" title="Invoice Details" defaultOpen={true}>
 
                 {/* Invoice Number */}
                 <div style={{ background: 'var(--cream)', border: '1.5px solid var(--border)', borderRadius: 9, padding: '14px 16px', marginBottom: 16 }}>
@@ -504,13 +515,10 @@ export default function InvoicePage() {
                     </select>
                   </div>
                 </div>
-              </div>
-            </div>
+            </CollapsibleCard>
 
             {/* BILLED TO */}
-            <div className="card">
-              <div className="card-header"><span className="icon">🏛️</span><h2>Billed To (Client)</h2></div>
-              <div className="card-body">
+            <CollapsibleCard icon="🏛️" title="Billed To (Client)">
                 <div className="grid2">
                   <div className="field col-span2">
                     <label>Client / Organisation Name</label>
@@ -529,13 +537,10 @@ export default function InvoicePage() {
                     <input value={billedTo.state} onChange={e => setBilledTo(p => ({ ...p, state: e.target.value }))} />
                   </div>
                 </div>
-              </div>
-            </div>
+            </CollapsibleCard>
 
             {/* ITEMS */}
-            <div className="card">
-              <div className="card-header"><span className="icon">📦</span><h2>Items / Services</h2></div>
-              <div className="card-body">
+            <CollapsibleCard icon="📦" title="Items / Services" defaultOpen={true}>
                 <div className="items-wrap">
                   <table>
                     <thead>
@@ -576,13 +581,10 @@ export default function InvoicePage() {
                 <div className="btn-row">
                   <button className="btn btn-outline" onClick={addItem}>＋ Add Item</button>
                 </div>
-              </div>
-            </div>
+            </CollapsibleCard>
 
             {/* GST SUMMARY */}
-            <div className="card">
-              <div className="card-header"><span className="icon">🧮</span><h2>Tax & Total Summary</h2></div>
-              <div className="card-body">
+            <CollapsibleCard icon="🧮" title="Tax & Total Summary" defaultOpen={true}>
                 <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <div className="field" style={{ marginBottom: 14 }}>
@@ -639,8 +641,7 @@ export default function InvoicePage() {
                   <div style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)', marginBottom: 4 }}>Amount in Words</div>
                   <div style={{ fontStyle: 'italic', fontSize: '0.9rem' }}>{numberToWords(rounded)}</div>
                 </div>
-              </div>
-            </div>
+            </CollapsibleCard>
 
             {/* bottom spacer for fixed footer */}
             <div style={{ height: 80 }} />
