@@ -75,11 +75,13 @@ function calcTotals(items, gstType, roundType) {
   let subtotal = 0
   const gstByRate = {}
   items.forEach(item => {
-    const base = item.qty * item.rate
+    // item.rate is GST-INCLUSIVE. Back out the taxable base from it.
+    const totalIncl = item.qty * item.rate
+    const base = totalIncl / (1 + item.gstRate / 100)
     subtotal += base
     const r = item.gstRate
     if (!gstByRate[r]) gstByRate[r] = 0
-    gstByRate[r] += base * r / 100
+    gstByRate[r] += totalIncl - base
   })
   const totalGST = Object.values(gstByRate).reduce((a, b) => a + b, 0)
   const withGST = subtotal + totalGST
@@ -300,9 +302,9 @@ export default function InvoicePage() {
   const cur = currency
 
   const itemRowsHtml = items.map((item, i) => {
-    const base = item.qty * item.rate
-    const gstAmt = base * item.gstRate / 100
-    const total = base + gstAmt
+    const total = item.qty * item.rate // rate is GST-inclusive
+    const base = total / (1 + item.gstRate / 100)
+    const gstAmt = total - base
     return `<tr>
       <td>${i + 1}</td>
       <td>${item.desc}${item.hsn ? `<br><small style="color:#999">HSN: ${item.hsn}</small>` : ''}</td>
@@ -360,7 +362,7 @@ export default function InvoicePage() {
       </div>
     </div>
     <table class="pv-table">
-      <thead><tr><th>#</th><th>Description</th><th>GST%</th><th class="right">Qty</th><th class="right">Rate</th><th class="right">Amount</th>${gstHeaders}<th class="right">Total</th></tr></thead>
+      <thead><tr><th>#</th><th>Description</th><th>GST%</th><th class="right">Qty</th><th class="right">Rate (incl. GST)</th><th class="right">Taxable Amount</th>${gstHeaders}<th class="right">Total</th></tr></thead>
       <tbody>${itemRowsHtml}</tbody>
     </table>
     <div class="pv-summary">
@@ -549,15 +551,15 @@ export default function InvoicePage() {
                         <th>Description</th>
                         <th style={{ width: 90 }}>HSN/SAC</th>
                         <th style={{ width: 70 }}>Qty</th>
-                        <th style={{ width: 110 }}>Rate</th>
+                        <th style={{ width: 110 }}>Rate (incl. GST)</th>
                         <th style={{ width: 90 }}>GST%</th>
-                        <th style={{ width: 120 }}>Amount</th>
+                        <th style={{ width: 120 }}>Amount (incl. GST)</th>
                         <th style={{ width: 40 }}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((item, i) => {
-                        const base = item.qty * item.rate
+                        const total = item.qty * item.rate // rate is GST-inclusive
                         return (
                           <tr key={i}>
                             <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.8rem' }}>{i + 1}</td>
@@ -570,7 +572,7 @@ export default function InvoicePage() {
                                 {[0, 3, 5, 12, 18, 28].map(r => <option key={r} value={r}>{r}%</option>)}
                               </select>
                             </td>
-                            <td className="td-num">{fmt(cur, base)}</td>
+                            <td className="td-num">{fmt(cur, total)}</td>
                             <td><button className="btn-del" onClick={() => delItem(i)}>✕</button></td>
                           </tr>
                         )
