@@ -6,14 +6,17 @@ function formatNo(prefix, num, pad) {
   return prefix + (pad > 0 ? String(num).padStart(pad, '0') : String(num))
 }
 
-// Pehli baar: counter doc nahi hai to purane bills ka sabse bada number nikaal kar seed karo,
-// taaki purana number dobara kabhi na aaye.
+// Pehli baar: counter doc nahi hai to seed karo.
+// User ne 66 tak ke bill manually bana liye hain → 67 se start hoga.
+// (DB me agar isse bada number mila to wahi jeetega — purana number repeat nahi hoga.)
+const MANUAL_LAST_NUM = 66
+
 async function ensureCounter(db) {
   const ref = db.collection('counters').doc(COUNTER_ID)
   const snap = await ref.get()
   if (snap.exists) return snap.data()
 
-  let maxNum = 0
+  let maxNum = MANUAL_LAST_NUM
   const invSnap = await db.collection('invoices').orderBy('invoice_no', 'desc').limit(100).get()
   for (const d of invSnap.docs) {
     const m = String(d.data().invoice_no || '').match(/(\d+)$/)

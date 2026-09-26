@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSession, signIn, signOut } from 'next-auth/react'
 
 // ── COLLAPSIBLE CARD ──────────────────────────────────────────
 function CollapsibleCard({ icon, title, children, defaultOpen = false, headerExtra }) {
@@ -103,6 +104,8 @@ const LS_KEY = 'arup_inv_counter'
 export default function InvoicePage() {
   // Tabs: editor | preview | history
   const [tab, setTab] = useState('editor')
+  const { data: session } = useSession() // Google Drive storage connection
+  const [pdfSaving, setPdfSaving] = useState(false) // Drive upload indicator
 
   // Billed By
   const [billedBy, setBilledBy] = useState(DEFAULT_BILLED_BY)
@@ -112,7 +115,7 @@ export default function InvoicePage() {
 
   // Invoice meta
   const [invPrefix, setInvPrefix] = useState('A')
-  const [invNum, setInvNum] = useState(11)
+  const [invNum, setInvNum] = useState(67) // 66 tak manual ho chuke — 67 se start
   const [invPad, setInvPad] = useState(5) // 5 digits → A00011
   const [dbSync, setDbSync] = useState(false) // true = counter DB se synced hai
   const [counterDirty, setCounterDirty] = useState(false) // user ne number manually badla
@@ -377,7 +380,45 @@ export default function InvoicePage() {
   }
 
   // ── Print ─────────────────────────────────────────────────
-  function handlePrint() {
+  // Pehle invoice ka PDF banao → Google Drive ("Arup Invoices" folder) par save karo → phir print dialog
+  async function generatePdfBlob() {
+    const html2pdf = (await import('html2pdf.js')).default
+    const el = document.createElement('div')
+    el.innerHTML = printHTML
+    el.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#ffffff;padding:36px;'
+    document.body.appendChild(el)
+    try {
+      const blob = await html2pdf().set({
+        margin: 10,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      }).from(el).output('blob')
+      return blob
+    } finally {
+      document.body.removeChild(el)
+    }
+  }
+
+  async function handlePrint() {
+    // Agar Google Drive connected hai to PDF auto-save karo
+    if (session?.user?.email) {
+      try {
+        setPdfSaving(true)
+        const blob = await generatePdfBlob()
+        const fd = new FormData()
+        fd.append('file', blob, `Invoice-${invNo}.pdf`)
+        fd.append('invoice_no', invNo)
+        const r = await fetch('/api/drive/upload', { method: 'POST', body: fd })
+        const d = await r.json()
+        if (r.ok) showToast('☁️ PDF Drive par save ho gaya', 'success')
+        else showToast('Drive save fail: ' + (d.error || 'unknown'), 'error')
+      } catch (e) {
+        showToast('Drive save fail: ' + e.message, 'error')
+      } finally {
+        setPdfSaving(false)
+      }
+    }
     window.print()
   }
 
@@ -488,6 +529,33 @@ export default function InvoicePage() {
         {/* ══ EDITOR TAB ══ */}
         {tab === 'editor' && (
           <>
+            {/* STORAGE BY ISWAR — Google Drive connect */}
+            <CollapsibleCard icon="☁️" title="Storage by Iswar" defaultOpen={!session}>
+              <div className="card-body">
+                {session?.user?.email ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '1.6rem' }}>✅</span>
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <div style={{ fontWeight: 600 }}>Connected: {session.user.email}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                        Print dabate hi PDF Drive ke <strong>Arup Invoices</strong> folder me auto-save hoga.
+                      </div>
+                    </div>
+                    <button className="btn btn-outline" onClick={() => signOut()}>Disconnect</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 180, fontSize: '0.9rem', color: '#555' }}>
+                      Apna Google account connect karo — phir har Print par invoice ka PDF
+                      tumhare Drive par khud save ho jayega.
+                    </div>
+                    <button className="btn btn-primary" onClick={() => signIn('google')}>
+                      🔗 Connect with Google
+                    </button>
+                  </div>
+                )}
+              </div>
+            </CollapsibleCard>
             {/* BILLED BY */}
             <CollapsibleCard icon="🏢" title="Billed By (Seller)">
                 <div className="grid2">
@@ -815,7 +883,7 @@ export default function InvoicePage() {
             <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
               {saving ? '⏳ Saving...' : '💾 Save to DB'}
             </button>
-            <button className="btn btn-outline" onClick={handlePrint}>🖨️ Print / PDF</button>
+            <button className="btn btn-outline" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Drive par save ho raha...' : '🖨️ Print / PDF'}</button>
           </>
         )}
         {tab === 'preview' && (
@@ -824,7 +892,7 @@ export default function InvoicePage() {
             <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
               {saving ? '⏳ Saving...' : '💾 Save to DB'}
             </button>
-            <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print / PDF</button>
+            <button className="btn btn-primary" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Drive par save ho raha...' : '🖨️ Print / PDF'}</button>
           </>
         )}
       </div>

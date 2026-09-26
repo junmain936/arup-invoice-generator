@@ -1,4 +1,5 @@
 import './globals.css'
+import Providers from './providers'
 
 export const metadata = {
   title: 'Invoice Generator — M/S Arup Enterprise',
@@ -14,7 +15,7 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body><Providers>{children}</Providers></body>
     </html>
   )
 }
