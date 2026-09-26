@@ -93,7 +93,7 @@ body {
   border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,150,62,0.16);
 }
 .field input::placeholder, .field textarea::placeholder { color: #b3afa3; }
-.field textarea { resize: vertical; min-height: 60px; }
+.field textarea { resize: vertical; min-height: 60px; max-height: 132px; }
 /* Settings card ke inputs (API key wagera) — wahi professional look */
 .settings-card-body input[type="password"], .settings-card-body input[type="text"] {
   background: #fff; border: 1px solid #d8d4c8; border-radius: 10px;

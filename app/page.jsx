@@ -658,7 +658,7 @@ export default function InvoicePage() {
                     </div>
                     <div className="field col-span2">
                       <label>Address</label>
-                      <textarea value={billedBy.address} onChange={e => setBilledBy(p => ({ ...p, address: e.target.value }))} />
+                      <textarea rows={3} value={billedBy.address} onChange={e => setBilledBy(p => ({ ...p, address: e.target.value }))} />
                     </div>
                     <div className="field">
                       <label>GSTIN</label>
