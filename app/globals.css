@@ -25,9 +25,30 @@ body {
 /* ── APP ── */
 .app { max-width: 960px; margin: 0 auto; }
 
-.app-header { text-align: center; margin-bottom: 28px; }
+.app-header { position: relative; text-align: center; margin-bottom: 28px; }
 .app-header h1 { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--ink); letter-spacing: -0.5px; }
 .app-header p { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+
+/* ── PROFILE (Google style, top-right) ── */
+.profile-wrap { position: absolute; top: 2px; right: 2px; }
+.profile-btn { position: relative; width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer; padding: 0; background: transparent; }
+.profile-avatar { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #7c5c3e, #4a3728); color: #fff; font-weight: 700; font-size: 1.1rem; font-family: 'DM Sans', sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+.profile-btn:hover .profile-avatar { box-shadow: 0 3px 12px rgba(0,0,0,0.28); }
+.profile-dot { position: absolute; bottom: 1px; right: 1px; width: 11px; height: 11px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
+.menu-scrim { position: fixed; inset: 0; z-index: 60; background: transparent; }
+.profile-menu { position: absolute; top: 48px; right: 0; z-index: 61; min-width: 190px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,0.16); overflow: hidden; padding: 6px; }
+.menu-item { display: block; width: 100%; text-align: left; padding: 10px 12px; font-size: 0.92rem; font-family: 'DM Sans', sans-serif; color: var(--ink); background: transparent; border: none; border-radius: 8px; cursor: pointer; }
+.menu-item:hover { background: var(--cream); }
+
+/* ── SETTINGS MODAL ── */
+.modal-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(30, 22, 14, 0.5); display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px 16px; }
+.modal-panel { width: 100%; max-width: 520px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.25); overflow: hidden; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1.5px solid var(--border); }
+.modal-head h2 { font-size: 1.15rem; color: var(--ink); margin: 0; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--cream); color: var(--ink); font-size: 0.95rem; cursor: pointer; }
+.modal-close:hover { background: var(--border); }
+.modal-body { padding: 18px; }
+.settings-section { font-size: 1rem; color: var(--ink); margin: 0 0 12px; }
 
 /* ── TABS ── */
 .tabs { display: flex; margin-bottom: 24px; background: var(--cream); border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
