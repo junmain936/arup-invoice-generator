@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useSession, signIn, signOut } from 'next-auth/react'
 
 // ── COLLAPSIBLE CARD ──────────────────────────────────────────
 function CollapsibleCard({ icon, title, children, defaultOpen = false, headerExtra }) {
@@ -104,8 +103,12 @@ const LS_KEY = 'arup_inv_counter'
 export default function InvoicePage() {
   // Tabs: editor | preview | history
   const [tab, setTab] = useState('editor')
-  const { data: session } = useSession() // Google Drive storage connection
-  const [pdfSaving, setPdfSaving] = useState(false) // Drive upload indicator
+  const [pdfSaving, setPdfSaving] = useState(false) // Storage upload indicator
+  // ── Storage by Iswar connection ──
+  const [storageConnected, setStorageConnected] = useState(false)
+  const [storageChecking, setStorageChecking] = useState(true)
+  const [storageKeyInput, setStorageKeyInput] = useState('')
+  const [storageBusy, setStorageBusy] = useState(false)
 
   // Billed By
   const [billedBy, setBilledBy] = useState(DEFAULT_BILLED_BY)
@@ -172,6 +175,15 @@ export default function InvoicePage() {
       } catch {}
     }
     loadCounter()
+    // Storage by Iswar connection status
+    ;(async () => {
+      try {
+        const r = await fetch('/api/storage/status')
+        const s = await r.json()
+        if (!cancelled) setStorageConnected(!!s.connected)
+      } catch {}
+      if (!cancelled) setStorageChecking(false)
+    })()
     return () => { cancelled = true }
   }, [])
 
@@ -379,8 +391,50 @@ export default function InvoicePage() {
     if (t === 'history') loadHistory()
   }
 
+  // ── Storage by Iswar: Connect / Disconnect ─────────────────
+  async function connectStorage() {
+    if (!storageKeyInput.trim()) { showToast('Pehle key paste karo', 'error'); return }
+    setStorageBusy(true)
+    try {
+      const res = await fetch('/api/storage/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_key: storageKeyInput.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) showToast(data.error || 'Connect fail', 'error')
+      else {
+        setStorageConnected(true)
+        setStorageKeyInput('')
+        showToast('☁️ Storage by Iswar connected!', 'success')
+      }
+    } catch (e) {
+      showToast('Connect fail: ' + e.message, 'error')
+    } finally {
+      setStorageBusy(false)
+    }
+  }
+
+  async function disconnectStorage() {
+    if (!confirm('Storage disconnect karna hai?')) return
+    setStorageBusy(true)
+    try {
+      const res = await fetch('/api/storage/disconnect', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) showToast(data.error || 'Disconnect fail', 'error')
+      else {
+        setStorageConnected(false)
+        showToast('Storage disconnected', 'info')
+      }
+    } catch (e) {
+      showToast('Disconnect fail: ' + e.message, 'error')
+    } finally {
+      setStorageBusy(false)
+    }
+  }
+
   // ── Print ─────────────────────────────────────────────────
-  // Pehle invoice ka PDF banao → Google Drive ("Arup Invoices" folder) par save karo → phir print dialog
+  // Pehle invoice ka PDF banao → Storage by Iswar par save karo → phir print dialog
   async function generatePdfBlob() {
     const html2pdf = (await import('html2pdf.js')).default
     const el = document.createElement('div')
@@ -401,20 +455,20 @@ export default function InvoicePage() {
   }
 
   async function handlePrint() {
-    // Agar Google Drive connected hai to PDF auto-save karo
-    if (session?.user?.email) {
+    // Agar Storage by Iswar connected hai to PDF auto-save karo
+    if (storageConnected) {
       try {
         setPdfSaving(true)
         const blob = await generatePdfBlob()
         const fd = new FormData()
         fd.append('file', blob, `Invoice-${invNo}.pdf`)
         fd.append('invoice_no', invNo)
-        const r = await fetch('/api/drive/upload', { method: 'POST', body: fd })
+        const r = await fetch('/api/storage/upload', { method: 'POST', body: fd })
         const d = await r.json()
-        if (r.ok) showToast('☁️ PDF Drive par save ho gaya', 'success')
-        else showToast('Drive save fail: ' + (d.error || 'unknown'), 'error')
+        if (r.ok) showToast('☁️ PDF Storage par save ho gaya', 'success')
+        else showToast('Storage save fail: ' + (d.error || 'unknown'), 'error')
       } catch (e) {
-        showToast('Drive save fail: ' + e.message, 'error')
+        showToast('Storage save fail: ' + e.message, 'error')
       } finally {
         setPdfSaving(false)
       }
@@ -529,29 +583,43 @@ export default function InvoicePage() {
         {/* ══ EDITOR TAB ══ */}
         {tab === 'editor' && (
           <>
-            {/* STORAGE BY ISWAR — Google Drive connect */}
-            <CollapsibleCard icon="☁️" title="Storage by Iswar" defaultOpen={!session}>
+            {/* STORAGE BY ISWAR — apna cloud storage connect */}
+            <CollapsibleCard icon="☁️" title="Storage by Iswar" defaultOpen={!storageConnected && !storageChecking}>
               <div className="card-body">
-                {session?.user?.email ? (
+                {storageChecking ? (
+                  <div style={{ fontSize: '0.9rem', color: '#666' }}>⏳ Connection check ho raha hai...</div>
+                ) : storageConnected ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '1.6rem' }}>✅</span>
                     <div style={{ flex: 1, minWidth: 180 }}>
-                      <div style={{ fontWeight: 600 }}>Connected: {session.user.email}</div>
+                      <div style={{ fontWeight: 600 }}>Connected</div>
                       <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                        Print dabate hi PDF Drive ke <strong>Arup Invoices</strong> folder me auto-save hoga.
+                        Print dabate hi PDF tumhare Storage by Iswar par auto-save hoga.
                       </div>
                     </div>
-                    <button className="btn btn-outline" onClick={() => signOut()}>Disconnect</button>
+                    <button className="btn btn-outline" disabled={storageBusy} onClick={disconnectStorage}>
+                      {storageBusy ? '⏳...' : 'Disconnect'}
+                    </button>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: 180, fontSize: '0.9rem', color: '#555' }}>
-                      Apna Google account connect karo — phir har Print par invoice ka PDF
-                      tumhare Drive par khud save ho jayega.
+                  <div>
+                    <div style={{ fontSize: '0.9rem', color: '#555', marginBottom: 10 }}>
+                      Apne <strong>Storage by Iswar</strong> app me <strong>Settings → Your personal API key</strong> se
+                      key copy karo aur yahan paste karke Connect dabao — phir har Print par invoice ka PDF
+                      tumhare storage par khud save ho jayega.
                     </div>
-                    <button className="btn btn-primary" onClick={() => signIn('google')}>
-                      🔗 Connect with Google
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <input
+                        type="password"
+                        placeholder="Personal API key yahan paste karo"
+                        value={storageKeyInput}
+                        onChange={e => setStorageKeyInput(e.target.value)}
+                        style={{ flex: 1, minWidth: 200 }}
+                      />
+                      <button className="btn btn-primary" disabled={storageBusy} onClick={connectStorage}>
+                        {storageBusy ? '⏳...' : '🔗 Connect'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -883,7 +951,7 @@ export default function InvoicePage() {
             <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
               {saving ? '⏳ Saving...' : '💾 Save to DB'}
             </button>
-            <button className="btn btn-outline" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Drive par save ho raha...' : '🖨️ Print / PDF'}</button>
+            <button className="btn btn-outline" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
           </>
         )}
         {tab === 'preview' && (
@@ -892,7 +960,7 @@ export default function InvoicePage() {
             <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
               {saving ? '⏳ Saving...' : '💾 Save to DB'}
             </button>
-            <button className="btn btn-primary" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Drive par save ho raha...' : '🖨️ Print / PDF'}</button>
+            <button className="btn btn-primary" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
           </>
         )}
       </div>
