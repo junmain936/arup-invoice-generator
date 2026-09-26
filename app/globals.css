@@ -42,19 +42,22 @@ body {
 
 /* ── SETTINGS MODAL ── */
 .modal-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(30, 22, 14, 0.5); display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px 16px; }
-.modal-panel { width: 100%; max-width: 520px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.25); overflow: hidden; }
-.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1.5px solid var(--border); }
+.modal-panel { width: 100%; max-width: 520px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; background: var(--paper); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.25); overflow: hidden; }
+.modal-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1.5px solid var(--border); }
 .modal-head h2 { font-size: 1.15rem; color: var(--ink); margin: 0; }
 .modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--cream); color: var(--ink); font-size: 0.95rem; cursor: pointer; }
 .modal-close:hover { background: var(--border); }
-.modal-body { padding: 18px; }
-/* ── Professional settings cards ── */
-.settings-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; box-shadow: 0 1px 5px rgba(26,26,46,0.05); }
+.modal-body { padding: 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+/* ── Professional settings cards (collapsible) ── */
+.settings-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; box-shadow: 0 1px 5px rgba(26,26,46,0.05); overflow: hidden; }
 .settings-card:last-child { margin-bottom: 0; }
-.settings-card-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.settings-card-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 14px 16px; background: transparent; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; text-align: left; }
 .settings-card-icon { font-size: 1.25rem; }
 .settings-card-head h3 { font-size: 0.98rem; font-weight: 700; color: var(--ink); margin: 0; }
-.settings-badge { margin-left: auto; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 3px 10px; border-radius: 999px; }
+.settings-chevron { margin-left: auto; color: var(--muted); font-size: 0.85rem; transition: transform 0.2s; }
+.settings-chevron.open { transform: rotate(180deg); }
+.settings-card-body { padding: 0 16px 16px; border-top: 1px solid var(--border); padding-top: 14px; margin: 0 0; }
+.settings-badge { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 3px 10px; border-radius: 999px; }
 .settings-note { font-size: 0.85rem; color: var(--muted); }
 .storage-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .storage-ok { font-weight: 600; color: var(--ink); font-size: 0.95rem; white-space: nowrap; }
@@ -81,12 +84,25 @@ body {
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .field input, .field textarea, .field select {
-  background: var(--cream); border: 1.5px solid var(--border); border-radius: 7px;
-  padding: 9px 12px; font-size: 0.88rem; font-family: 'DM Sans', sans-serif;
-  color: var(--ink); outline: none; transition: border-color 0.15s; width: 100%;
+  background: #fff; border: 1px solid #d8d4c8; border-radius: 10px;
+  padding: 11px 14px; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+  color: var(--ink); outline: none; transition: border-color 0.15s, box-shadow 0.15s; width: 100%;
+  box-shadow: inset 0 1px 2px rgba(26,26,46,0.04);
 }
-.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); }
+.field input:focus, .field textarea:focus, .field select:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,150,62,0.16);
+}
+.field input::placeholder, .field textarea::placeholder { color: #b3afa3; }
 .field textarea { resize: vertical; min-height: 60px; }
+/* Settings card ke inputs (API key wagera) — wahi professional look */
+.settings-card-body input[type="password"], .settings-card-body input[type="text"] {
+  background: #fff; border: 1px solid #d8d4c8; border-radius: 10px;
+  padding: 11px 14px; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+  color: var(--ink); outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: inset 0 1px 2px rgba(26,26,46,0.04);
+}
+.settings-card-body input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,150,62,0.16); }
+.settings-card-body input::placeholder { color: #b3afa3; }
 
 /* ── ITEMS TABLE ── */
 .items-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }

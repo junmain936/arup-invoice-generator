@@ -17,6 +17,22 @@ function CollapsibleCard({ icon, title, children, defaultOpen = false, headerExt
   )
 }
 
+// ── SETTINGS MODAL CARD (collapsible, default band) ──
+function SettingsCard({ icon, title, badge, children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="settings-card">
+      <button className="settings-card-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <span className="settings-card-icon">{icon}</span>
+        <h3>{title}</h3>
+        {badge}
+        <span className={`settings-chevron${open ? ' open' : ''}`}>▾</span>
+      </button>
+      {open && <div className="settings-card-body">{children}</div>}
+    </div>
+  )
+}
+
 // ── DEFAULTS ──────────────────────────────────────────────────
 const DEFAULT_BILLED_BY = {
   name: 'M/S Arup Enterprise',
@@ -601,12 +617,8 @@ export default function InvoicePage() {
               </div>
               <div className="modal-body">
                 {/* ── STORAGE CARD ── */}
-                <div className="settings-card">
-                  <div className="settings-card-head">
-                    <span className="settings-card-icon">☁️</span>
-                    <h3>Storage by Iswar</h3>
-                    {storageConnected && <span className="settings-badge">Connected</span>}
-                  </div>
+                <SettingsCard icon="☁️" title="Storage by Iswar"
+                  badge={storageConnected ? <span className="settings-badge">Connected</span> : null}>
                   {storageChecking ? (
                     <div className="settings-note">⏳ Checking...</div>
                   ) : storageConnected ? (
@@ -635,14 +647,10 @@ export default function InvoicePage() {
                       </div>
                     </>
                   )}
-                </div>
+                </SettingsCard>
 
                 {/* ── BILLED BY CARD ── */}
-                <div className="settings-card">
-                  <div className="settings-card-head">
-                    <span className="settings-card-icon">🏢</span>
-                    <h3>Billed By (Seller)</h3>
-                  </div>
+                <SettingsCard icon="🏢" title="Billed By (Seller)">
                   <div className="grid2">
                     <div className="field col-span2">
                       <label>Business Name</label>
@@ -673,7 +681,7 @@ export default function InvoicePage() {
                       <input value={billedBy.bank} onChange={e => setBilledBy(p => ({ ...p, bank: e.target.value }))} />
                     </div>
                   </div>
-                </div>
+                </SettingsCard>
               </div>
             </div>
           </div>
