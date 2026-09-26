@@ -156,6 +156,15 @@ export default function InvoicePage() {
 
   // ── Invoice No computed ──────────────────────────────────
   const invNo = invPrefix + (invPad > 0 ? String(invNum).padStart(invPad, '0') : String(invNum))
+  // Save / Print tabhi active jab saare required fields bhare hon (GSTIN + HSN/SAC optional)
+  // Preview hamesha khula rehta hai
+  const canSavePrint =
+    (billedTo.name || '').trim() !== '' &&
+    (billedTo.address || '').trim() !== '' &&
+    (billedTo.state || '').trim() !== '' &&
+    items.length > 0 &&
+    items.every(it => (it.desc || '').trim() !== '' && Number(it.qty) > 0 && Number(it.rate) > 0)
+  const savePrintHint = canSavePrint ? '' : 'Saare required fields bharo (GSTIN / HSN optional hai)'
 
   // ── Load counter: pehle DB se, fail ho to localStorage fallback ──
   useEffect(() => {
@@ -311,7 +320,7 @@ export default function InvoicePage() {
 
   // ── Save to Supabase (number DB se reserve — kabhi repeat nahi) ──
   async function saveInvoice() {
-    if (items.length === 0) { showToast('Pehle kam se kam 1 item add karo', 'error'); return }
+    if (!canSavePrint) { showToast('Pehle saare required fields bharo (GSTIN / HSN optional hai)', 'error'); return }
     setSaving(true)
     try {
       // 1) Invoice number DB se pakka karo
@@ -501,6 +510,7 @@ export default function InvoicePage() {
   }
 
   async function handlePrint() {
+    if (!canSavePrint) { showToast('Pehle saare required fields bharo (GSTIN / HSN optional hai)', 'error'); return }
     // Agar Storage by Iswar connected hai to PDF auto-save karo
     if (storageConnected) {
       try {
@@ -1097,19 +1107,19 @@ export default function InvoicePage() {
         {tab === 'editor' && (
           <>
             <button className="btn btn-primary" onClick={() => handleTabChange('preview')}>👁️ Preview</button>
-            <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
+            <button className="btn btn-accent" disabled={saving || !canSavePrint} title={savePrintHint} onClick={saveInvoice}>
               {saving ? '⏳ Saving...' : '💾 Save to DB'}
             </button>
-            <button className="btn btn-outline" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
+            <button className="btn btn-outline" disabled={pdfSaving || !canSavePrint} title={savePrintHint} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
           </>
         )}
         {tab === 'preview' && (
           <>
             <button className="btn btn-outline" onClick={() => setTab('editor')}>← Editor</button>
-            <button className="btn btn-accent" disabled={saving} onClick={saveInvoice}>
+            <button className="btn btn-accent" disabled={saving || !canSavePrint} title={savePrintHint} onClick={saveInvoice}>
               {saving ? '⏳ Saving...' : '💾 Save to DB'}
             </button>
-            <button className="btn btn-primary" disabled={pdfSaving} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
+            <button className="btn btn-primary" disabled={pdfSaving || !canSavePrint} title={savePrintHint} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
           </>
         )}
       </div>
