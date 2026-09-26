@@ -108,6 +108,7 @@ export default function InvoicePage() {
   const [pdfSaving, setPdfSaving] = useState(false) // Storage upload indicator
   // ── Storage by Iswar connection ──
   const [storageConnected, setStorageConnected] = useState(false)
+  const [storageKeySaved, setStorageKeySaved] = useState(false) // key DB me hai (valid ho ya na ho)
   const [storageChecking, setStorageChecking] = useState(true)
   const [storageKeyInput, setStorageKeyInput] = useState('')
   const [storageBusy, setStorageBusy] = useState(false)
@@ -116,6 +117,7 @@ export default function InvoicePage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [billedByOpen, setBilledByOpen] = useState(false)
   const [billedBySaving, setBilledBySaving] = useState(false)
+  const [billedByLoading, setBilledByLoading] = useState(true) // DB se aane tak skeleton
 
   // Billed By
   const [billedBy, setBilledBy] = useState(DEFAULT_BILLED_BY)
@@ -128,6 +130,7 @@ export default function InvoicePage() {
   const [invNum, setInvNum] = useState(67) // 66 tak manual ho chuke — 67 se start
   const [invPad, setInvPad] = useState(5) // 5 digits → A00011
   const [dbSync, setDbSync] = useState(false) // true = counter DB se synced hai
+  const [counterLoading, setCounterLoading] = useState(true) // DB se number aane tak skeleton
   const [counterDirty, setCounterDirty] = useState(false) // user ne number manually badla
   const [invDate, setInvDate] = useState(toISOLocal(new Date()))
   const [dueDate, setDueDate] = useState('')
@@ -169,6 +172,7 @@ export default function InvoicePage() {
         setDbSync(true)
         setCounterDirty(false)
         try { localStorage.setItem(LS_KEY, JSON.stringify({ prefix: c.prefix, num: c.next_num, pad: c.pad })) } catch {}
+        if (!cancelled) setCounterLoading(false)
         return
       } catch { /* DB nahi mila — neeche LS fallback */ }
       try {
@@ -180,14 +184,18 @@ export default function InvoicePage() {
           setLastSavedNo(s.lastNo || '—')
         }
       } catch {}
+      if (!cancelled) setCounterLoading(false)
     }
     loadCounter()
-    // Storage by Iswar connection status
+    // Storage by Iswar connection status (hamesha fresh — cache nahi)
     ;(async () => {
       try {
-        const r = await fetch('/api/storage/status')
+        const r = await fetch('/api/storage/status', { cache: 'no-store' })
         const s = await r.json()
-        if (!cancelled) setStorageConnected(!!s.connected)
+        if (!cancelled) {
+          setStorageConnected(!!s.connected)
+          setStorageKeySaved(!!s.keySaved)
+        }
       } catch {}
       if (!cancelled) setStorageChecking(false)
     })()
@@ -199,6 +207,7 @@ export default function InvoicePage() {
         const s = await r.json()
         if (!cancelled && s.billedBy) setBilledBy(b => ({ ...b, ...s.billedBy }))
       } catch {}
+      if (!cancelled) setBilledByLoading(false)
     })()
     return () => { cancelled = true }
   }, [])
@@ -421,6 +430,7 @@ export default function InvoicePage() {
       if (!res.ok) showToast(data.error || 'Connect fail', 'error')
       else {
         setStorageConnected(true)
+        setStorageKeySaved(true)
         setStorageKeyInput('')
         showToast('☁️ Storage by Iswar connected!', 'success')
       }
@@ -440,6 +450,7 @@ export default function InvoicePage() {
       if (!res.ok) showToast(data.error || 'Disconnect fail', 'error')
       else {
         setStorageConnected(false)
+        setStorageKeySaved(false)
         showToast('Storage disconnected', 'info')
       }
     } catch (e) {
@@ -642,11 +653,13 @@ export default function InvoicePage() {
                   <div className="settings-card-head-static">
                     <span className="settings-card-icon">☁️</span>
                     <h3>Storage by Iswar</h3>
-                    {storageConnected && <span className="settings-badge">Connected</span>}
+                    {storageConnected
+                      ? <span className="settings-badge">Connected</span>
+                      : (!storageChecking && storageKeySaved && <span className="settings-badge settings-badge-warn">Key saved</span>)}
                   </div>
                   <div className="settings-card-body">
                   {storageChecking ? (
-                    <div className="settings-note">⏳ Checking...</div>
+                    <div className="skeleton" style={{ height: 42, borderRadius: 9 }}>&nbsp;</div>
                   ) : storageConnected ? (
                     <div className="storage-row">
                       <span className="settings-note">Print par PDF auto-save hoga.</span>
@@ -654,6 +667,30 @@ export default function InvoicePage() {
                         {storageBusy ? '⏳...' : 'Disconnect'}
                       </button>
                     </div>
+                  ) : storageKeySaved ? (
+                    <>
+                      <div className="settings-note" style={{ marginBottom: 10 }}>
+                        ⚠️ Key database me <strong>save hai</strong>, par abhi verify nahi ho rahi — Storage app me
+                        <strong> Settings → Your personal API key</strong> check karo. Badal gayi ho to neeche nayi paste karo.
+                      </div>
+                      <div className="storage-row">
+                        <input
+                          type="password"
+                          placeholder="Nayi API key"
+                          value={storageKeyInput}
+                          onChange={e => setStorageKeyInput(e.target.value)}
+                          style={{ flex: 1, minWidth: 180 }}
+                        />
+                        <button className="btn btn-primary" disabled={storageBusy} onClick={connectStorage}>
+                          {storageBusy ? '⏳...' : '🔗 Connect'}
+                        </button>
+                      </div>
+                      <div className="storage-row" style={{ marginTop: 10 }}>
+                        <button className="btn btn-outline" disabled={storageBusy} onClick={disconnectStorage}>
+                          {storageBusy ? '⏳...' : 'Disconnect'}
+                        </button>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <div className="settings-note" style={{ marginBottom: 10 }}>
@@ -690,6 +727,17 @@ export default function InvoicePage() {
                 <button className="modal-close" onClick={() => setBilledByOpen(false)} aria-label="Close">✕</button>
               </div>
               <div className="sidebar-body">
+                {billedByLoading ? (
+                  <>
+                    {['Business Name', 'Address', 'GSTIN', 'PAN', 'Email', 'Phone', 'Bank Details'].map(f => (
+                      <div className="field" key={f}>
+                        <label>{f}</label>
+                        <div className="skeleton" style={{ height: f === 'Address' ? 66 : 40, borderRadius: 9 }}>&nbsp;</div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <>
                   <div className="field">
                   <label>Business Name</label>
                   <input value={billedBy.name} onChange={e => setBilledBy(p => ({ ...p, name: e.target.value }))} />
@@ -722,6 +770,8 @@ export default function InvoicePage() {
                   {billedBySaving ? '⏳ Saving...' : '💾 Database me Save karo'}
                 </button>
                 <div className="settings-note">Ye details database me save hongi — har device par same dikhengi, code kholne ki zaroorat nahi.</div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -765,9 +815,13 @@ export default function InvoicePage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 130 }}>
                       <label style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>Preview</label>
-                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.05rem', fontWeight: 600, color: 'var(--accent)', background: '#fff', border: '1.5px solid var(--border)', borderRadius: 7, padding: '8px 12px', letterSpacing: 1 }}>
-                        {invNo}
-                      </div>
+                      {counterLoading ? (
+                        <div className="skeleton" style={{ height: 40, borderRadius: 7 }}>&nbsp;</div>
+                      ) : (
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.05rem', fontWeight: 600, color: 'var(--accent)', background: '#fff', border: '1.5px solid var(--border)', borderRadius: 7, padding: '8px 12px', letterSpacing: 1 }}>
+                          {invNo}
+                        </div>
+                      )}
                     </div>
                     <button className="btn btn-outline" style={{ height: 38, whiteSpace: 'nowrap' }} onClick={autoIncrement}>⚡ Next No.</button>
                   </div>
@@ -972,7 +1026,17 @@ export default function InvoicePage() {
             </div>
             <div className="card">
               <div className="card-body">
-                <div dangerouslySetInnerHTML={{ __html: printHTML }} />
+                {(counterLoading || billedByLoading) ? (
+                  <div style={{ padding: 8 }}>
+                    <div className="skeleton" style={{ height: 28, width: '55%', marginBottom: 14, borderRadius: 6 }}>&nbsp;</div>
+                    <div className="skeleton" style={{ height: 90, marginBottom: 14, borderRadius: 8 }}>&nbsp;</div>
+                    <div className="skeleton" style={{ height: 90, marginBottom: 14, borderRadius: 8 }}>&nbsp;</div>
+                    <div className="skeleton" style={{ height: 160, marginBottom: 14, borderRadius: 8 }}>&nbsp;</div>
+                    <div className="skeleton" style={{ height: 60, borderRadius: 8 }}>&nbsp;</div>
+                  </div>
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: printHTML }} />
+                )}
               </div>
             </div>
             {/* bottom spacer for fixed footer */}
@@ -990,7 +1054,11 @@ export default function InvoicePage() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               {historyLoading ? (
-                <div className="history-empty">Loading...</div>
+                <div style={{ padding: '14px 16px' }}>
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="skeleton" style={{ height: 46, marginBottom: 10, borderRadius: 8 }}>&nbsp;</div>
+                  ))}
+                </div>
               ) : history.length === 0 ? (
                 <div className="history-empty">Koi invoice save nahi hai abhi.</div>
               ) : (

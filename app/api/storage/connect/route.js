@@ -16,10 +16,16 @@ export async function POST(request) {
       )
     }
 
-    await getDb().collection('storage_config').doc('main').set({
+    const ref = getDb().collection('storage_config').doc('main')
+    await ref.set({
       user_key: key,
       connected_at: new Date().toISOString(),
     })
+    // Write confirm: wapas padhkar pakka karo key save hui
+    const check = await ref.get()
+    if (!check.data()?.user_key) {
+      throw new Error('Firestore me key save confirm nahi hui — dobara try karo')
+    }
 
     return Response.json({ ok: true })
   } catch (e) {
