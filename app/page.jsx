@@ -40,6 +40,9 @@ const DEFAULT_BILLED_TO = {
 // Items start empty — user adds via "＋ Add Item" (no preset item)
 const EMPTY_ITEM = { desc: '', hsn: '', qty: 1, rate: 0, gstRate: 18 }
 
+// Delete PIN — invoice delete karne se pehle mangta hai (soft lock: code me dikhta hai)
+const DELETE_PIN = '939857'
+
 // ── HELPERS ───────────────────────────────────────────────────
 function toISOLocal(d) {
   const y = d.getFullYear()
@@ -105,7 +108,6 @@ const LS_KEY = 'arup_inv_counter'
 export default function InvoicePage() {
   // Tabs: editor | preview | history
   const [tab, setTab] = useState('editor')
-  const [pdfSaving, setPdfSaving] = useState(false) // Storage upload indicator
   // ── Storage by Iswar connection ──
   const [storageConnected, setStorageConnected] = useState(false)
   const [storageKeySaved, setStorageKeySaved] = useState(false) // key DB me hai (valid ho ya na ho)
@@ -151,9 +153,18 @@ export default function InvoicePage() {
   const [historyLoading, setHistoryLoading] = useState(false)
 
   // UI state
-  const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
+  const [printProg, setPrintProg] = useState(null) // { pct, label } — print processing overlay
   const printRef = useRef(null)
+
+  // Delete PIN popup
+  const [savedInvoice, setSavedInvoice] = useState(null) // { id, no } — abhi save hui invoice (preview me delete ke liye)
+  const [pinOpen, setPinOpen] = useState(false)
+  const [pinTarget, setPinTarget] = useState(null) // { id, no }
+  const [pinDigits, setPinDigits] = useState(['', '', '', '', '', ''])
+  const [pinError, setPinError] = useState('')
+  const [pinBusy, setPinBusy] = useState(false)
+  const pinRefs = useRef([])
 
   // ── Invoice No computed ──────────────────────────────────
   const invNo = invPrefix + (invPad > 0 ? String(invNum).padStart(invPad, '0') : String(invNum))
@@ -341,13 +352,14 @@ export default function InvoicePage() {
   }
 
   // ── Save to Supabase (number DB se reserve — kabhi repeat nahi) ──
-  async function saveInvoice() {
-    if (!canSavePrint) { showToast('Pehle saare required fields bharo (GSTIN / HSN optional hai)', 'error'); return }
-    setSaving(true)
-    try {
-      // 1) Invoice number DB se pakka karo
-      let useNo = invNo
-      let reserved = null
+  // ── Invoice DB me save karo (helper — toast nahi, caller progress dikhata hai) ──
+  // 409 (same number pehle se) aaye to purana delete karke naya save — DB hamesha latest rahe
+  // Returns { ok, id, no } — fail par throw
+  async function persistInvoiceToDb(onStage, opts = {}) {
+    // 1) Invoice number DB se pakka karo (dobara print par naya number waste mat karo)
+    let useNo = invNo
+    let reserved = null
+    if (!opts.skipReserve) {
       try {
         if (counterDirty) {
           // User ne number haath se badla tha — pehle DB ko usi se align karo
@@ -357,6 +369,7 @@ export default function InvoicePage() {
             body: JSON.stringify({ action: 'set', prefix: invPrefix, num: invNum, pad: invPad }),
           })
         }
+        onStage && onStage('num')
         const r = await fetch('/api/counter', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -372,48 +385,113 @@ export default function InvoicePage() {
         setDbSync(true)
         setCounterDirty(false)
       } catch {
-        showToast('DB se number reserve nahi hua — local number use ho raha hai', 'error')
+        throw new Error('DB se number reserve nahi hua — net check karo')
       }
-
-      // 2) Invoice save karo
-      const payload = {
-        invoice_no: useNo,
-        invoice_date: invDate,
-        due_date: dueDate || null,
-        billed_by: billedBy,
-        billed_to: billedTo,
-        items,
-        gst_type: gstType,
-        subtotal: totals.subtotal,
-        total_gst: totals.totalGST,
-        grand_total: totals.rounded,
-        currency,
-      }
-
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        showToast(data.error || 'Save failed', 'error')
-      } else {
-        // Save counter to LS (backup)
-        try {
-          const bk = reserved || { prefix: invPrefix, num: invNum, pad: invPad }
-          localStorage.setItem(LS_KEY, JSON.stringify({ prefix: bk.prefix, num: bk.num, pad: bk.pad, lastNo: useNo }))
-          setLastSavedNo(useNo)
-        } catch {}
-        showToast(`Invoice ${useNo} saved! ✅`, 'success')
-      }
-    } catch (e) {
-      showToast('Network error: ' + e.message, 'error')
-    } finally {
-      setSaving(false)
     }
+
+    // 2) Invoice save karo (upsert: 409 aaye to purana hata ke naya)
+    const payload = {
+      invoice_no: useNo,
+      invoice_date: invDate,
+      due_date: dueDate || null,
+      billed_by: billedBy,
+      billed_to: billedTo,
+      items,
+      gst_type: gstType,
+      subtotal: totals.subtotal,
+      total_gst: totals.totalGST,
+      grand_total: totals.rounded,
+      currency,
+    }
+
+    onStage && onStage('save')
+    const postOnce = () => fetch('/api/invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    let res = await postOnce()
+    let data = await res.json().catch(() => ({}))
+    if (res.status === 409) {
+      const lr = await fetch('/api/invoices')
+      const ld = await lr.json().catch(() => ({}))
+      const old = (ld.invoices || []).find(i => i.invoice_no === useNo)
+      if (old?.id) await fetch(`/api/invoice/${old.id}`, { method: 'DELETE' })
+      res = await postOnce()
+      data = await res.json().catch(() => ({}))
+    }
+    if (!res.ok) throw new Error(data.error || 'DB save fail')
+
+    // Save counter to LS (backup)
+    try {
+      const bk = reserved || { prefix: invPrefix, num: invNum, pad: invPad }
+      localStorage.setItem(LS_KEY, JSON.stringify({ prefix: bk.prefix, num: bk.num, pad: bk.pad, lastNo: useNo }))
+      setLastSavedNo(useNo)
+    } catch {}
+    const rec = data.invoice?.id ? { id: data.invoice.id, no: useNo } : null
+    setSavedInvoice(rec) // preview me delete button ke liye
+    return { ok: true, id: rec?.id || null, no: useNo }
+  }
+
+  // ── Storage upload (XHR — REAL upload % ke liye) ──
+  function uploadPdfBlob(blob, no, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/storage/upload')
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total)
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)) } catch { resolve({}) }
+        } else reject(new Error('Storage upload fail (' + xhr.status + ')'))
+      }
+      xhr.onerror = () => reject(new Error('Network error — upload nahi hua'))
+      const fd = new FormData()
+      fd.append('file', blob, `Invoice-${no}.pdf`)
+      fd.append('invoice_no', no)
+      xhr.send(fd)
+    })
+  }
+
+  // ── PRINT: pehle DB save → phir storage upload → uske baad hi print dialog ──
+  async function handlePrint() {
+    if (!canSavePrint) { showToast('Pehle saare required fields bharo (GSTIN / HSN optional hai)', 'error'); return }
+    if (printProg) return // already chal raha hai
+    let finalNo = invNo
+    try {
+      setPrintProg({ pct: 3, label: 'Taiyaar ho raha...' })
+      // 1) DB save (dobara print par same number → reserve skip, upsert se DB update)
+      const alreadySaved = savedInvoice && savedInvoice.id && savedInvoice.no === invNo
+      setPrintProg({ pct: 8, label: alreadySaved ? 'Database me update ho raha...' : 'Invoice number reserve ho raha...' })
+      const saved = await persistInvoiceToDb(stage => {
+        if (stage === 'save') setPrintProg({ pct: 24, label: 'Database me save ho raha...' })
+      }, { skipReserve: !!alreadySaved })
+      finalNo = saved.no
+      setPrintProg({ pct: 44, label: `Database me save ho gaya ✓ (${finalNo})` })
+      // 2) Storage by Iswar par PDF upload
+      if (storageConnected) {
+        setPrintProg({ pct: 52, label: 'PDF ban raha...' })
+        const blob = await generatePdfBlob()
+        if (!blob || blob.size < 1000) throw new Error('PDF blank bana — dobara try karo')
+        setPrintProg({ pct: 60, label: 'Storage par upload ho raha... 0%' })
+        await uploadPdfBlob(blob, finalNo, up => {
+          const pct = Math.round(60 + up * 36)
+          setPrintProg({ pct, label: `Storage par upload ho raha... ${Math.round(up * 100)}%` })
+        })
+        setPrintProg({ pct: 98, label: 'Storage par save ho gaya ✓' })
+      } else {
+        setPrintProg({ pct: 96, label: 'Storage connected nahi — seedha print hoga' })
+      }
+      setPrintProg({ pct: 100, label: 'Ho gaya! 🎉' })
+      await new Promise(r => setTimeout(r, 450))
+    } catch (e) {
+      setPrintProg(null)
+      showToast('❌ ' + (e.message || 'Print fail'), 'error')
+      return
+    }
+    setPrintProg(null)
+    setTimeout(() => window.print(), 150)
   }
 
   // ── Load history ──────────────────────────────────────────
@@ -431,14 +509,87 @@ export default function InvoicePage() {
     }
   }
 
-  // ── Delete invoice ────────────────────────────────────────
-  async function deleteInvoice(id, no) {
-    if (!confirm(`Delete invoice ${no}?`)) return
-    const res = await fetch(`/api/invoice/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      setHistory(prev => prev.filter(inv => inv.id !== id))
-      showToast(`${no} deleted`, 'info')
-    } else showToast('Delete failed', 'error')
+  // ── Delete invoice (PIN popup ke saath) ──────────────────
+  function askDelete(id, no) {
+    setPinTarget({ id, no })
+    setPinDigits(['', '', '', '', '', ''])
+    setPinError('')
+    setPinOpen(true)
+    setTimeout(() => pinRefs.current[0]?.focus(), 60)
+  }
+
+  function closePin() {
+    if (pinBusy) return
+    setPinOpen(false)
+    setPinTarget(null)
+    setPinError('')
+  }
+
+  function handlePinChange(i, v) {
+    const d = v.replace(/\D/g, '').slice(-1) // sirf ak digit
+    const next = [...pinDigits]
+    next[i] = d
+    setPinDigits(next)
+    setPinError('')
+    if (d && i < 5) pinRefs.current[i + 1]?.focus()
+    if (d && i === 5) {
+      const full = next.join('')
+      if (full.length === 6) setTimeout(() => submitPin(full), 120)
+    }
+  }
+
+  function handlePinKeyDown(i, e) {
+    if (e.key === 'Backspace' && !pinDigits[i] && i > 0) {
+      pinRefs.current[i - 1]?.focus()
+    }
+    if (e.key === 'Enter') {
+      const full = pinDigits.join('')
+      if (full.length === 6) submitPin(full)
+    }
+  }
+
+  function handlePinPaste(e) {
+    e.preventDefault()
+    const t = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6)
+    if (!t) return
+    const next = ['','','','','',''].map((_, i) => t[i] || '')
+    setPinDigits(next)
+    setPinError('')
+    const last = Math.min(t.length, 6) - 1
+    pinRefs.current[last]?.focus()
+    if (t.length === 6) setTimeout(() => submitPin(t), 120)
+  }
+
+  function submitPin(override) {
+    const full = override || pinDigits.join('')
+    if (full.length !== 6 || pinBusy) return
+    if (full === DELETE_PIN) {
+      doDelete()
+    } else {
+      setPinError('❌ Galat PIN — dobara try karo')
+      setPinDigits(['', '', '', '', '', ''])
+      const box = document.querySelector('.pin-boxes')
+      if (box) { box.classList.remove('pin-shake'); void box.offsetWidth; box.classList.add('pin-shake') }
+      setTimeout(() => pinRefs.current[0]?.focus(), 60)
+    }
+  }
+
+  async function doDelete() {
+    if (!pinTarget) return
+    setPinBusy(true)
+    try {
+      const res = await fetch(`/api/invoice/${pinTarget.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      setHistory(prev => prev.filter(inv => inv.id !== pinTarget.id))
+      if (savedInvoice?.id === pinTarget.id) setSavedInvoice(null)
+      showToast(`${pinTarget.no} deleted`, 'info')
+      setPinOpen(false)
+      setPinTarget(null)
+    } catch (e) {
+      setPinError('❌ ' + e.message)
+    } finally {
+      setPinBusy(false)
+    }
   }
 
   // ── Switch to history tab → load ─────────────────────────
@@ -516,7 +667,8 @@ export default function InvoicePage() {
     const html2pdf = (await import('html2pdf.js')).default
     const el = document.createElement('div')
     el.innerHTML = printHTML
-    el.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#ffffff;padding:36px;'
+    // NOTE: position:absolute (fixed NAHI) — html2canvas fixed elements ko viewport se bahar blank render karta hai
+    el.style.cssText = 'position:absolute;left:-10000px;top:0;width:794px;display:block;box-sizing:border-box;background:#ffffff;padding:36px;'
     document.body.appendChild(el)
     try {
       const blob = await html2pdf().set({
@@ -531,28 +683,7 @@ export default function InvoicePage() {
     }
   }
 
-  async function handlePrint() {
-    if (!canSavePrint) { showToast('Pehle saare required fields bharo (GSTIN / HSN optional hai)', 'error'); return }
-    // Agar Storage by Iswar connected hai to PDF auto-save karo
-    if (storageConnected) {
-      try {
-        setPdfSaving(true)
-        const blob = await generatePdfBlob()
-        const fd = new FormData()
-        fd.append('file', blob, `Invoice-${invNo}.pdf`)
-        fd.append('invoice_no', invNo)
-        const r = await fetch('/api/storage/upload', { method: 'POST', body: fd })
-        const d = await r.json()
-        if (r.ok) showToast('☁️ PDF Storage par save ho gaya', 'success')
-        else showToast('Storage save fail: ' + (d.error || 'unknown'), 'error')
-      } catch (e) {
-        showToast('Storage save fail: ' + e.message, 'error')
-      } finally {
-        setPdfSaving(false)
-      }
-    }
-    window.print()
-  }
+  // (print flow upar handlePrint me hai — DB save → storage upload → print dialog)
 
   // ── BUILD PRINT HTML ─────────────────────────────────────
   const { subtotal, totalGST, rounded, roundOff, rateLabel } = totals
@@ -1099,6 +1230,7 @@ export default function InvoicePage() {
               ) : history.length === 0 ? (
                 <div className="history-empty">Koi invoice save nahi hai abhi.</div>
               ) : (
+                <div className="history-wrap">
                 <table className="history-table">
                   <thead>
                     <tr>
@@ -1117,12 +1249,13 @@ export default function InvoicePage() {
                         <td>{inv.billed_to?.name || '—'}</td>
                         <td className="mono">{inv.currency || '₹'}{Number(inv.grand_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td>
-                          <button className="btn-del" onClick={() => deleteInvoice(inv.id, inv.invoice_no)}>🗑</button>
+                          <button className="btn-del" onClick={() => askDelete(inv.id, inv.invoice_no)}>🗑</button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>
@@ -1134,19 +1267,16 @@ export default function InvoicePage() {
         {tab === 'editor' && (
           <>
             <button className="btn btn-primary" onClick={() => handleTabChange('preview')}>👁️ Preview</button>
-            <button className="btn btn-accent" disabled={saving || !canSavePrint} title={savePrintHint} onClick={saveInvoice}>
-              {saving ? '⏳ Saving...' : '💾 Save to DB'}
-            </button>
-            <button className="btn btn-outline" disabled={pdfSaving || !canSavePrint} title={savePrintHint} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
+            <button className="btn btn-outline" disabled={!canSavePrint} title={savePrintHint} onClick={handlePrint}>🖨️ Print / PDF</button>
           </>
         )}
         {tab === 'preview' && (
           <>
             <button className="btn btn-outline" onClick={() => setTab('editor')}>← Editor</button>
-            <button className="btn btn-accent" disabled={saving || !canSavePrint} title={savePrintHint} onClick={saveInvoice}>
-              {saving ? '⏳ Saving...' : '💾 Save to DB'}
-            </button>
-            <button className="btn btn-primary" disabled={pdfSaving || !canSavePrint} title={savePrintHint} onClick={handlePrint}>{pdfSaving ? '☁️ Storage par save ho raha...' : '🖨️ Print / PDF'}</button>
+            <button className="btn btn-primary" disabled={!canSavePrint} title={savePrintHint} onClick={handlePrint}>🖨️ Print / PDF</button>
+            {savedInvoice && (
+              <button className="btn-del" style={{ padding: '10px 14px', fontSize: '1rem' }} title={`${savedInvoice.no} delete karo`} onClick={() => askDelete(savedInvoice.id, savedInvoice.no)}>🗑</button>
+            )}
           </>
         )}
       </div>
@@ -1154,6 +1284,68 @@ export default function InvoicePage() {
       {/* TOAST */}
       {toast && (
         <div className={`toast ${toast.type}`}>{toast.msg}</div>
+      )}
+
+      {/* PRINT PROCESSING OVERLAY — blur + real % bar */}
+      {printProg && (
+        <div className="proc-overlay no-print">
+          <div className="proc-card">
+            <span className="proc-icon">⚙️</span>
+            <div className="proc-label">{printProg.label}</div>
+            <div className="proc-bar">
+              <div className="proc-fill" style={{ width: `${printProg.pct}%` }} />
+            </div>
+            <div className="proc-pct">{printProg.pct}%</div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE PIN POPUP */}
+      {pinOpen && pinTarget && (
+        <div className="modal-overlay" onClick={closePin}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: 380 }}>
+            <div className="modal-head">
+              <h2>🗑️ Delete Invoice</h2>
+              <button className="modal-close" onClick={closePin} aria-label="Close">✕</button>
+            </div>
+            <div style={{ padding: '18px 20px 20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.95rem', color: 'var(--ink)', marginBottom: 4 }}>
+                Invoice <strong className="mono">{pinTarget.no}</strong> delete karna hai?
+              </div>
+              <div className="settings-note" style={{ marginBottom: 4 }}>Ye action wapas nahi hoga. Confirm karne ke liye 6-digit PIN dalo:</div>
+              <div className="pin-boxes" onPaste={handlePinPaste}>
+                {pinDigits.map((d, i) => (
+                  <input
+                    key={i}
+                    ref={el => (pinRefs.current[i] = el)}
+                    className="pin-box"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={d}
+                    disabled={pinBusy}
+                    onChange={e => handlePinChange(i, e.target.value)}
+                    onKeyDown={e => handlePinKeyDown(i, e)}
+                    onFocus={e => e.target.select()}
+                    aria-label={`PIN digit ${i + 1}`}
+                  />
+                ))}
+              </div>
+              <div className="pin-error">{pinError || '\u00A0'}</div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button className="btn btn-outline" style={{ flex: 1 }} disabled={pinBusy} onClick={closePin}>Cancel</button>
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1, background: '#b91c1c', borderColor: '#b91c1c' }}
+                  disabled={pinBusy || pinDigits.join('').length !== 6}
+                  onClick={() => submitPin()}
+                >
+                  {pinBusy ? '⏳...' : '🗑️ Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

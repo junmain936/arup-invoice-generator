@@ -250,6 +250,14 @@ tbody td input:focus, tbody td select:focus { border-color: var(--accent); backg
 .skeleton::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent); animation: shimmer 1.2s infinite; }
 @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 
+/* ── DELETE PIN POPUP ── */
+.pin-boxes { display: flex; gap: 8px; justify-content: center; margin: 16px 0 8px; }
+.pin-box { width: 44px; height: 52px; text-align: center; font-size: 1.4rem; font-weight: 700; font-family: 'JetBrains Mono, monospace'; border: 1.5px solid var(--border); border-radius: 10px; background: #fff; color: var(--ink); outline: none; }
+.pin-box:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(176, 122, 31, 0.18); }
+.pin-error { color: #b91c1c; font-size: 0.85rem; font-weight: 600; text-align: center; min-height: 22px; }
+.pin-shake { animation: pinshake 0.35s; }
+@keyframes pinshake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 50% { transform: translateX(7px); } 75% { transform: translateX(-4px); } }
+
 /* ── FIXED BOTTOM ACTION BAR ── */
 .fixed-action-bar {
   position: fixed;
@@ -273,8 +281,20 @@ tbody td input:focus, tbody td select:focus { border-color: var(--accent); backg
 }
 
 /* ── PRINT ── */
+@page { size: A4; margin: 0; }
 @media print {
-  body { background: #fff !important; padding: 0 !important; }
+  body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
   .no-print { display: none !important; }
-  .print-view { display: block !important; padding: 28px; background: #fff; font-family: 'DM Sans', sans-serif; color: #111; }
+  .print-view { display: block !important; padding: 12mm 10mm; background: #fff; font-family: 'DM Sans', sans-serif; color: #111; }
+  .print-view > :last-child { margin-bottom: 0 !important; padding-bottom: 0 !important; }
 }
+
+/* ── PRINT PROCESSING OVERLAY (blur + real % bar) ── */
+.proc-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(250, 246, 238, 0.55); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.proc-card { width: 100%; max-width: 340px; background: var(--paper); border: 1.5px solid var(--border); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); padding: 26px 22px; text-align: center; }
+.proc-icon { font-size: 2.2rem; animation: procspin 1.4s linear infinite; display: inline-block; }
+@keyframes procspin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.proc-label { font-size: 0.92rem; font-weight: 600; color: var(--ink); margin: 12px 0 14px; min-height: 22px; }
+.proc-bar { height: 12px; background: var(--cream); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
+.proc-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #d99a2b); border-radius: 99px; transition: width 0.25s ease; }
+.proc-pct { font-size: 1.5rem; font-weight: 800; color: var(--accent); margin-top: 10px; font-family: 'JetBrains Mono', monospace; }
