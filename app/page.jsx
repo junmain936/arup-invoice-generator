@@ -109,6 +109,9 @@ export default function InvoicePage() {
   const [storageChecking, setStorageChecking] = useState(true)
   const [storageKeyInput, setStorageKeyInput] = useState('')
   const [storageBusy, setStorageBusy] = useState(false)
+  // ── Profile menu + Settings modal ──
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Billed By
   const [billedBy, setBilledBy] = useState(DEFAULT_BILLED_BY)
@@ -569,23 +572,36 @@ export default function InvoicePage() {
         <div className="app-header">
           <h1>⚡ Invoice Generator</h1>
           <p>M/S Arup Enterprise · GST Invoice with Supabase</p>
-        </div>
-
-        {/* TABS */}
-        <div className="tabs">
-          {['editor', 'preview', 'history'].map(t => (
-            <button key={t} className={`tab${tab === t ? ' active' : ''}`} onClick={() => handleTabChange(t)}>
-              {t === 'editor' ? '✏️ Editor' : t === 'preview' ? '👁️ Preview' : '🗂️ History'}
+          {/* ── Profile (Google style) : menu → Settings → Storage connect ── */}
+          <div className="profile-wrap">
+            <button className="profile-btn" onClick={() => setProfileOpen(o => !o)} title="Profile" aria-label="Profile menu">
+              <span className="profile-avatar">A</span>
+              {storageConnected && <span className="profile-dot" title="Storage connected" />}
             </button>
-          ))}
+            {profileOpen && (
+              <>
+                <div className="menu-scrim" onClick={() => setProfileOpen(false)} />
+                <div className="profile-menu">
+                  <button className="menu-item" onClick={() => { setProfileOpen(false); setSettingsOpen(true); }}>
+                    ⚙️ Settings
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* ══ EDITOR TAB ══ */}
-        {tab === 'editor' && (
-          <>
-            {/* STORAGE BY ISWAR — apna cloud storage connect */}
-            <CollapsibleCard icon="☁️" title="Storage by Iswar" defaultOpen={!storageConnected && !storageChecking}>
-              <div className="card-body">
+        {/* ── SETTINGS MODAL ── */}
+        {settingsOpen && (
+          <div className="modal-overlay" onClick={() => setSettingsOpen(false)}>
+            <div className="modal-panel" onClick={e => e.stopPropagation()}>
+              <div className="modal-head">
+                <h2>⚙️ Settings</h2>
+                <button className="modal-close" onClick={() => setSettingsOpen(false)} aria-label="Close">✕</button>
+              </div>
+              <div className="modal-body">
+                {/* STORAGE BY ISWAR */}
+                <h3 className="settings-section">☁️ Storage by Iswar</h3>
                 {storageChecking ? (
                   <div style={{ fontSize: '0.9rem', color: '#666' }}>⏳ Connection check ho raha hai...</div>
                 ) : storageConnected ? (
@@ -623,7 +639,22 @@ export default function InvoicePage() {
                   </div>
                 )}
               </div>
-            </CollapsibleCard>
+            </div>
+          </div>
+        )}
+
+        {/* TABS */}
+        <div className="tabs">
+          {['editor', 'preview', 'history'].map(t => (
+            <button key={t} className={`tab${tab === t ? ' active' : ''}`} onClick={() => handleTabChange(t)}>
+              {t === 'editor' ? '✏️ Editor' : t === 'preview' ? '👁️ Preview' : '🗂️ History'}
+            </button>
+          ))}
+        </div>
+
+        {/* ══ EDITOR TAB ══ */}
+        {tab === 'editor' && (
+          <>
             {/* BILLED BY */}
             <CollapsibleCard icon="🏢" title="Billed By (Seller)">
                 <div className="grid2">
