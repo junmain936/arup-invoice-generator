@@ -32,7 +32,11 @@ body {
 /* ── PROFILE (Google style, top-right) ── */
 .profile-wrap { position: absolute; top: 2px; right: 2px; }
 .profile-btn { position: relative; width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer; padding: 0; background: transparent; }
-.profile-avatar { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #7c5c3e, #4a3728); color: #fff; font-weight: 700; font-size: 1.1rem; font-family: 'DM Sans', sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+.profile-avatar { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent2), var(--accent)); color: var(--ink); font-weight: 700; font-size: 1.1rem; font-family: 'DM Sans', sans-serif; box-shadow: 0 2px 8px rgba(200,150,62,0.4); border: 2px solid #fff; }
+/* Header icon button — circular */
+.icon-btn { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--paper); font-size: 1.15rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.icon-btn:hover { border-color: var(--accent); }
+.hamburger-btn { position: absolute; top: 2px; left: 2px; }
 .profile-btn:hover .profile-avatar { box-shadow: 0 3px 12px rgba(0,0,0,0.28); }
 .profile-dot { position: absolute; bottom: 1px; right: 1px; width: 11px; height: 11px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
 .menu-scrim { position: fixed; inset: 0; z-index: 60; background: transparent; }
@@ -51,13 +55,19 @@ body {
 /* ── Professional settings cards (collapsible) ── */
 .settings-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; box-shadow: 0 1px 5px rgba(26,26,46,0.05); overflow: hidden; }
 .settings-card:last-child { margin-bottom: 0; }
-.settings-card-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 14px 16px; background: transparent; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; text-align: left; }
+.settings-card-head-static { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.settings-card-head-static h3 { font-size: 0.98rem; font-weight: 700; color: var(--ink); margin: 0; }
+.settings-card-head-static .settings-badge { margin-left: auto; }
 .settings-card-icon { font-size: 1.25rem; }
-.settings-card-head h3 { font-size: 0.98rem; font-weight: 700; color: var(--ink); margin: 0; }
-.settings-chevron { margin-left: auto; color: var(--muted); font-size: 0.85rem; transition: transform 0.2s; }
-.settings-chevron.open { transform: rotate(180deg); }
 .settings-card-body { padding: 0 16px 16px; border-top: 1px solid var(--border); padding-top: 14px; margin: 0 0; }
 .settings-badge { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 3px 10px; border-radius: 999px; }
+/* ── BILLED BY SIDEBAR (slide-in, left) ── */
+.sidebar-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(30, 22, 14, 0.5); }
+.sidebar-panel { position: absolute; top: 0; left: 0; height: 100%; width: min(420px, 94vw); background: var(--paper); border-right: 1.5px solid var(--border); box-shadow: 12px 0 40px rgba(0,0,0,0.22); display: flex; flex-direction: column; animation: sidebarIn 0.25s ease-out; }
+@keyframes sidebarIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+.sidebar-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1.5px solid var(--border); }
+.sidebar-head h2 { font-size: 1.1rem; color: var(--ink); margin: 0; }
+.sidebar-body { padding: 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 14px; }
 .settings-note { font-size: 0.85rem; color: var(--muted); }
 .storage-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .storage-ok { font-weight: 600; color: var(--ink); font-size: 0.95rem; white-space: nowrap; }

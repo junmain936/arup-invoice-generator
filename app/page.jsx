@@ -17,22 +17,6 @@ function CollapsibleCard({ icon, title, children, defaultOpen = false, headerExt
   )
 }
 
-// ── SETTINGS MODAL CARD (collapsible, default band) ──
-function SettingsCard({ icon, title, badge, children }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="settings-card">
-      <button className="settings-card-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <span className="settings-card-icon">{icon}</span>
-        <h3>{title}</h3>
-        {badge}
-        <span className={`settings-chevron${open ? ' open' : ''}`}>▾</span>
-      </button>
-      {open && <div className="settings-card-body">{children}</div>}
-    </div>
-  )
-}
-
 // ── DEFAULTS ──────────────────────────────────────────────────
 const DEFAULT_BILLED_BY = {
   name: 'M/S Arup Enterprise',
@@ -128,6 +112,7 @@ export default function InvoicePage() {
   // ── Profile menu + Settings modal ──
   const [profileOpen, setProfileOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [billedByOpen, setBilledByOpen] = useState(false)
 
   // Billed By
   const [billedBy, setBilledBy] = useState(DEFAULT_BILLED_BY)
@@ -586,6 +571,9 @@ export default function InvoicePage() {
       {/* ── MAIN APP ── */}
       <div className="app no-print">
         <div className="app-header">
+          <button className="icon-btn hamburger-btn" onClick={() => setBilledByOpen(true)} title="Billed By (Seller)" aria-label="Menu">
+            ☰
+          </button>
           <h1>⚡ Invoice Generator</h1>
           <p>M/S Arup Enterprise · GST Invoice with Supabase</p>
           {/* ── Profile (Google style) : menu → Settings → Storage connect ── */}
@@ -616,43 +604,16 @@ export default function InvoicePage() {
                 <button className="modal-close" onClick={() => setSettingsOpen(false)} aria-label="Close">✕</button>
               </div>
               <div className="modal-body">
-                {/* ── BILLED BY CARD ── */}
-                <SettingsCard icon="🏢" title="Billed By (Seller)">
-                  <div className="grid2">
-                    <div className="field col-span2">
-                      <label>Business Name</label>
-                      <input value={billedBy.name} onChange={e => setBilledBy(p => ({ ...p, name: e.target.value }))} />
-                    </div>
-                    <div className="field col-span2">
-                      <label>Address</label>
-                      <textarea rows={3} value={billedBy.address} onChange={e => setBilledBy(p => ({ ...p, address: e.target.value }))} />
-                    </div>
-                    <div className="field">
-                      <label>GSTIN</label>
-                      <input value={billedBy.gstin} onChange={e => setBilledBy(p => ({ ...p, gstin: e.target.value }))} />
-                    </div>
-                    <div className="field">
-                      <label>PAN</label>
-                      <input value={billedBy.pan} onChange={e => setBilledBy(p => ({ ...p, pan: e.target.value }))} />
-                    </div>
-                    <div className="field">
-                      <label>Email</label>
-                      <input value={billedBy.email} onChange={e => setBilledBy(p => ({ ...p, email: e.target.value }))} />
-                    </div>
-                    <div className="field">
-                      <label>Phone</label>
-                      <input value={billedBy.phone} onChange={e => setBilledBy(p => ({ ...p, phone: e.target.value }))} />
-                    </div>
-                    <div className="field col-span2">
-                      <label>Bank Details</label>
-                      <input value={billedBy.bank} onChange={e => setBilledBy(p => ({ ...p, bank: e.target.value }))} />
-                    </div>
-                  </div>
-                </SettingsCard>
+                
 
                 {/* ── STORAGE CARD ── */}
-                <SettingsCard icon="☁️" title="Storage by Iswar"
-                  badge={storageConnected ? <span className="settings-badge">Connected</span> : null}>
+                <div className="settings-card">
+                  <div className="settings-card-head-static">
+                    <span className="settings-card-icon">☁️</span>
+                    <h3>Storage by Iswar</h3>
+                    {storageConnected && <span className="settings-badge">Connected</span>}
+                  </div>
+                  <div className="settings-card-body">
                   {storageChecking ? (
                     <div className="settings-note">⏳ Checking...</div>
                   ) : storageConnected ? (
@@ -681,8 +642,51 @@ export default function InvoicePage() {
                       </div>
                     </>
                   )}
-                </SettingsCard>
+                </div>
+                </div>
 
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── BILLED BY SIDEBAR ── */}
+        {billedByOpen && (
+          <div className="sidebar-overlay" onClick={() => setBilledByOpen(false)}>
+            <div className="sidebar-panel" onClick={e => e.stopPropagation()}>
+              <div className="sidebar-head">
+                <h2>🏢 Billed By (Seller)</h2>
+                <button className="modal-close" onClick={() => setBilledByOpen(false)} aria-label="Close">✕</button>
+              </div>
+              <div className="sidebar-body">
+                  <div className="field">
+                  <label>Business Name</label>
+                  <input value={billedBy.name} onChange={e => setBilledBy(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="field">
+                  <label>Address</label>
+                  <textarea rows={3} value={billedBy.address} onChange={e => setBilledBy(p => ({ ...p, address: e.target.value }))} />
+                  </div>
+                  <div className="field">
+                  <label>GSTIN</label>
+                  <input value={billedBy.gstin} onChange={e => setBilledBy(p => ({ ...p, gstin: e.target.value }))} />
+                  </div>
+                  <div className="field">
+                  <label>PAN</label>
+                  <input value={billedBy.pan} onChange={e => setBilledBy(p => ({ ...p, pan: e.target.value }))} />
+                  </div>
+                  <div className="field">
+                  <label>Email</label>
+                  <input value={billedBy.email} onChange={e => setBilledBy(p => ({ ...p, email: e.target.value }))} />
+                  </div>
+                  <div className="field">
+                  <label>Phone</label>
+                  <input value={billedBy.phone} onChange={e => setBilledBy(p => ({ ...p, phone: e.target.value }))} />
+                  </div>
+                  <div className="field">
+                  <label>Bank Details</label>
+                  <input value={billedBy.bank} onChange={e => setBilledBy(p => ({ ...p, bank: e.target.value }))} />
+                  </div>
               </div>
             </div>
           </div>
