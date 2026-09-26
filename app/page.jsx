@@ -616,39 +616,6 @@ export default function InvoicePage() {
                 <button className="modal-close" onClick={() => setSettingsOpen(false)} aria-label="Close">✕</button>
               </div>
               <div className="modal-body">
-                {/* ── STORAGE CARD ── */}
-                <SettingsCard icon="☁️" title="Storage by Iswar"
-                  badge={storageConnected ? <span className="settings-badge">Connected</span> : null}>
-                  {storageChecking ? (
-                    <div className="settings-note">⏳ Checking...</div>
-                  ) : storageConnected ? (
-                    <div className="storage-row">
-                      <span className="settings-note">Print par PDF auto-save hoga.</span>
-                      <button className="btn btn-outline" disabled={storageBusy} onClick={disconnectStorage}>
-                        {storageBusy ? '⏳...' : 'Disconnect'}
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="settings-note" style={{ marginBottom: 10 }}>
-                        Storage app → <strong>Settings → Your personal API key</strong> se key copy karke yahan paste karo.
-                      </div>
-                      <div className="storage-row">
-                        <input
-                          type="password"
-                          placeholder="API key"
-                          value={storageKeyInput}
-                          onChange={e => setStorageKeyInput(e.target.value)}
-                          style={{ flex: 1, minWidth: 180 }}
-                        />
-                        <button className="btn btn-primary" disabled={storageBusy} onClick={connectStorage}>
-                          {storageBusy ? '⏳...' : '🔗 Connect'}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </SettingsCard>
-
                 {/* ── BILLED BY CARD ── */}
                 <SettingsCard icon="🏢" title="Billed By (Seller)">
                   <div className="grid2">
@@ -682,6 +649,40 @@ export default function InvoicePage() {
                     </div>
                   </div>
                 </SettingsCard>
+
+                {/* ── STORAGE CARD ── */}
+                <SettingsCard icon="☁️" title="Storage by Iswar"
+                  badge={storageConnected ? <span className="settings-badge">Connected</span> : null}>
+                  {storageChecking ? (
+                    <div className="settings-note">⏳ Checking...</div>
+                  ) : storageConnected ? (
+                    <div className="storage-row">
+                      <span className="settings-note">Print par PDF auto-save hoga.</span>
+                      <button className="btn btn-outline" disabled={storageBusy} onClick={disconnectStorage}>
+                        {storageBusy ? '⏳...' : 'Disconnect'}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="settings-note" style={{ marginBottom: 10 }}>
+                        Storage app → <strong>Settings → Your personal API key</strong> se key copy karke yahan paste karo.
+                      </div>
+                      <div className="storage-row">
+                        <input
+                          type="password"
+                          placeholder="API key"
+                          value={storageKeyInput}
+                          onChange={e => setStorageKeyInput(e.target.value)}
+                          style={{ flex: 1, minWidth: 180 }}
+                        />
+                        <button className="btn btn-primary" disabled={storageBusy} onClick={connectStorage}>
+                          {storageBusy ? '⏳...' : '🔗 Connect'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </SettingsCard>
+
               </div>
             </div>
           </div>
