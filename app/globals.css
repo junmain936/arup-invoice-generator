@@ -48,7 +48,16 @@ body {
 .modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--cream); color: var(--ink); font-size: 0.95rem; cursor: pointer; }
 .modal-close:hover { background: var(--border); }
 .modal-body { padding: 18px; }
-.settings-section { font-size: 1rem; color: var(--ink); margin: 0 0 12px; }
+/* ── Professional settings cards ── */
+.settings-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; box-shadow: 0 1px 5px rgba(26,26,46,0.05); }
+.settings-card:last-child { margin-bottom: 0; }
+.settings-card-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.settings-card-icon { font-size: 1.25rem; }
+.settings-card-head h3 { font-size: 0.98rem; font-weight: 700; color: var(--ink); margin: 0; }
+.settings-badge { margin-left: auto; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 3px 10px; border-radius: 999px; }
+.settings-note { font-size: 0.85rem; color: var(--muted); }
+.storage-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.storage-ok { font-weight: 600; color: var(--ink); font-size: 0.95rem; white-space: nowrap; }
 
 /* ── TABS ── */
 .tabs { display: flex; margin-bottom: 24px; background: var(--cream); border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
