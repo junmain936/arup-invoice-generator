@@ -25,7 +25,7 @@ const DEFAULT_BILLED_BY = {
   pan: 'BVHPT5295B',
   email: 'aruptimchine12@gmail.com',
   phone: '+91 93985 79293',
-  bank: 'STATE BANK OF INDIA | A/C: ARUP TIMSINA | A/C No: 34636510687 | IFSC: SBIN0009142',
+  bank: 'PUNJAB NATIONAL BANK | A/C: ARUP TIMSINA | A/C No: 2051202100001172 | IFSC: PUNB0205120',
 }
 
 const DEFAULT_BILLED_TO = {
@@ -35,9 +35,8 @@ const DEFAULT_BILLED_TO = {
   state: 'Assam, India',
 }
 
-const DEFAULT_ITEMS = [
-  { desc: 'A4 size Plain Copier Paper', hsn: '4802', qty: 70, rate: 338.99, gstRate: 18 }
-]
+// Items start empty — user adds via "＋ Add Item" (no preset item)
+const EMPTY_ITEM = { desc: '', hsn: '', qty: 1, rate: 0, gstRate: 18 }
 
 // ── HELPERS ───────────────────────────────────────────────────
 function toISOLocal(d) {
@@ -115,6 +114,8 @@ export default function InvoicePage() {
   const [invPrefix, setInvPrefix] = useState('A')
   const [invNum, setInvNum] = useState(11)
   const [invPad, setInvPad] = useState(5) // 5 digits → A00011
+  const [dbSync, setDbSync] = useState(false) // true = counter DB se synced hai
+  const [counterDirty, setCounterDirty] = useState(false) // user ne number manually badla
   const [invDate, setInvDate] = useState(toISOLocal(new Date()))
   const [dueDate, setDueDate] = useState('')
   const [countrySupply, setCountrySupply] = useState('India')
@@ -126,7 +127,7 @@ export default function InvoicePage() {
   const [lastSavedNo, setLastSavedNo] = useState('—')
 
   // Items
-  const [items, setItems] = useState(DEFAULT_ITEMS.map(i => ({ ...i })))
+  const [items, setItems] = useState([])
 
   // History
   const [history, setHistory] = useState([])
@@ -140,17 +141,57 @@ export default function InvoicePage() {
   // ── Invoice No computed ──────────────────────────────────
   const invNo = invPrefix + (invPad > 0 ? String(invNum).padStart(invPad, '0') : String(invNum))
 
-  // ── Load counter from LS ─────────────────────────────────
+  // ── Load counter: pehle DB se, fail ho to localStorage fallback ──
   useEffect(() => {
-    try {
-      const s = JSON.parse(localStorage.getItem(LS_KEY))
-      if (s) {
-        setInvPrefix(s.prefix)
-        setInvNum(s.num)
-        setInvPad(s.pad)
-        setLastSavedNo(s.lastNo || '—')
+    let cancelled = false
+    async function loadCounter() {
+      try {
+        const res = await fetch('/api/counter')
+        if (!res.ok) throw new Error('counter api fail')
+        const c = await res.json()
+        if (cancelled) return
+        setInvPrefix(c.prefix)
+        setInvNum(c.next_num)
+        setInvPad(c.pad)
+        setDbSync(true)
+        setCounterDirty(false)
+        try { localStorage.setItem(LS_KEY, JSON.stringify({ prefix: c.prefix, num: c.next_num, pad: c.pad })) } catch {}
+        return
+      } catch { /* DB nahi mila — neeche LS fallback */ }
+      try {
+        const s = JSON.parse(localStorage.getItem(LS_KEY))
+        if (s && !cancelled) {
+          setInvPrefix(s.prefix)
+          setInvNum(s.num)
+          setInvPad(s.pad)
+          setLastSavedNo(s.lastNo || '—')
+        }
+      } catch {}
+    }
+    loadCounter()
+    return () => { cancelled = true }
+  }, [])
+
+  // ── Print ke baad auto-next: DB se agla number lao ──
+  useEffect(() => {
+    async function onAfterPrint() {
+      try {
+        const res = await fetch('/api/counter')
+        if (!res.ok) throw new Error('counter api fail')
+        const c = await res.json()
+        setInvPrefix(c.prefix)
+        setInvNum(c.next_num)
+        setInvPad(c.pad)
+        setDbSync(true)
+        setCounterDirty(false)
+        showToast(`🖨️ Print ho gaya — agla number: ${c.next_no}`, 'info')
+      } catch {
+        setInvNum(n => n + 1) // DB nahi mila to local +1
+        showToast('🖨️ Print ho gaya — agla number (local)', 'info')
       }
-    } catch {}
+    }
+    window.addEventListener('afterprint', onAfterPrint)
+    return () => window.removeEventListener('afterprint', onAfterPrint)
   }, [])
 
   // ── Persist counter to LS on change ─────────────────────
@@ -180,11 +221,10 @@ export default function InvoicePage() {
   }
 
   function addItem() {
-    setItems(prev => [...prev, { desc: 'New Item', hsn: '', qty: 1, rate: 0, gstRate: 18 }])
+    setItems(prev => [...prev, { ...EMPTY_ITEM }])
   }
 
   function delItem(i) {
-    if (items.length === 1) { showToast('At least one item required', 'error'); return }
     setItems(prev => prev.filter((_, idx) => idx !== i))
   }
 
@@ -200,10 +240,11 @@ export default function InvoicePage() {
     setInvDate(toISOLocal(d))
   }
 
-  // ── Auto increment ───────────────────────────────────────
+  // ── Auto increment (local skip — save par DB se pakka hoga) ──
   function autoIncrement() {
     const next = invNum + 1
     setInvNum(next)
+    setCounterDirty(true)
     setLastSavedNo(invNo)
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({ prefix: invPrefix, num: next, pad: invPad, lastNo: invNo }))
@@ -211,19 +252,61 @@ export default function InvoicePage() {
     showToast(`Invoice number → ${invPrefix}${invPad > 0 ? String(next).padStart(invPad, '0') : next}`, 'info')
   }
 
-  function resetCounter() {
-    if (!confirm('Counter reset karega — sure?')) return
-    localStorage.removeItem(LS_KEY)
-    setLastSavedNo('—')
-    showToast('Counter reset ho gaya', 'info')
+  // ── DB se counter dobara sync karo ──
+  async function resyncCounter() {
+    try {
+      const res = await fetch('/api/counter')
+      if (!res.ok) throw new Error('counter api fail')
+      const c = await res.json()
+      setInvPrefix(c.prefix)
+      setInvNum(c.next_num)
+      setInvPad(c.pad)
+      setDbSync(true)
+      setCounterDirty(false)
+      showToast(`DB se sync ho gaya — agla number: ${c.next_no}`, 'success')
+    } catch {
+      showToast('DB se connect nahi ho paya', 'error')
+    }
   }
 
-  // ── Save to Supabase ──────────────────────────────────────
+  // ── Save to Supabase (number DB se reserve — kabhi repeat nahi) ──
   async function saveInvoice() {
+    if (items.length === 0) { showToast('Pehle kam se kam 1 item add karo', 'error'); return }
     setSaving(true)
     try {
+      // 1) Invoice number DB se pakka karo
+      let useNo = invNo
+      let reserved = null
+      try {
+        if (counterDirty) {
+          // User ne number haath se badla tha — pehle DB ko usi se align karo
+          await fetch('/api/counter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'set', prefix: invPrefix, num: invNum, pad: invPad }),
+          })
+        }
+        const r = await fetch('/api/counter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reserve' }),
+        })
+        if (!r.ok) throw new Error('reserve fail')
+        const c = await r.json()
+        reserved = c
+        useNo = c.invoice_no
+        setInvPrefix(c.prefix)
+        setInvNum(c.num) // save ke baad yehi number dikhega (print ke liye)
+        setInvPad(c.pad)
+        setDbSync(true)
+        setCounterDirty(false)
+      } catch {
+        showToast('DB se number reserve nahi hua — local number use ho raha hai', 'error')
+      }
+
+      // 2) Invoice save karo
       const payload = {
-        invoice_no: invNo,
+        invoice_no: useNo,
         invoice_date: invDate,
         due_date: dueDate || null,
         billed_by: billedBy,
@@ -247,12 +330,13 @@ export default function InvoicePage() {
       if (!res.ok) {
         showToast(data.error || 'Save failed', 'error')
       } else {
-        // Save counter to LS
+        // Save counter to LS (backup)
         try {
-          localStorage.setItem(LS_KEY, JSON.stringify({ prefix: invPrefix, num: invNum, pad: invPad, lastNo: invNo }))
-          setLastSavedNo(invNo)
+          const bk = reserved || { prefix: invPrefix, num: invNum, pad: invPad }
+          localStorage.setItem(LS_KEY, JSON.stringify({ prefix: bk.prefix, num: bk.num, pad: bk.pad, lastNo: useNo }))
+          setLastSavedNo(useNo)
         } catch {}
-        showToast(`Invoice ${invNo} saved! ✅`, 'success')
+        showToast(`Invoice ${useNo} saved! ✅`, 'success')
       }
     } catch (e) {
       showToast('Network error: ' + e.message, 'error')
@@ -447,15 +531,15 @@ export default function InvoicePage() {
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <div className="field" style={{ flex: 1, minWidth: 100 }}>
                       <label>Prefix</label>
-                      <input value={invPrefix} onChange={e => setInvPrefix(e.target.value)} style={{ fontFamily: 'JetBrains Mono, monospace' }} />
+                      <input value={invPrefix} onChange={e => { setInvPrefix(e.target.value); setCounterDirty(true) }} style={{ fontFamily: 'JetBrains Mono, monospace' }} />
                     </div>
                     <div className="field" style={{ flex: 1, minWidth: 90 }}>
                       <label>Number</label>
-                      <input type="number" value={invNum} min={1} onChange={e => setInvNum(parseInt(e.target.value) || 1)} style={{ fontFamily: 'JetBrains Mono, monospace' }} />
+                      <input type="number" value={invNum} min={1} onChange={e => { setInvNum(parseInt(e.target.value) || 1); setCounterDirty(true) }} style={{ fontFamily: 'JetBrains Mono, monospace' }} />
                     </div>
                     <div className="field" style={{ flex: 1, minWidth: 90 }}>
                       <label>Padding</label>
-                      <select value={invPad} onChange={e => setInvPad(parseInt(e.target.value))} style={{ fontFamily: 'JetBrains Mono, monospace' }}>
+                      <select value={invPad} onChange={e => { setInvPad(parseInt(e.target.value)); setCounterDirty(true) }} style={{ fontFamily: 'JetBrains Mono, monospace' }}>
                         <option value={3}>3 → 001</option>
                         <option value={4}>4 → 0001</option>
                         <option value={5}>5 → 00001</option>
@@ -473,7 +557,7 @@ export default function InvoicePage() {
                   <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Last saved:</span>
                     <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.78rem', color: 'var(--ink)', background: '#fff', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px' }}>{lastSavedNo}</span>
-                    <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={resetCounter}>🗑 Reset Counter</button>
+                    <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={resyncCounter}>↻ DB Sync {dbSync ? '🟢' : '🟠'}</button>
                   </div>
                 </div>
 
@@ -558,6 +642,13 @@ export default function InvoicePage() {
                       </tr>
                     </thead>
                     <tbody>
+                      {items.length === 0 && (
+                        <tr>
+                          <td colSpan={8} style={{ textAlign: 'center', padding: '20px 8px', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                            Koi item nahi — neeche <b>＋ Add Item</b> dabakar item jodo
+                          </td>
+                        </tr>
+                      )}
                       {items.map((item, i) => {
                         const total = item.qty * item.rate // rate is GST-inclusive
                         return (
@@ -565,8 +656,14 @@ export default function InvoicePage() {
                             <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.8rem' }}>{i + 1}</td>
                             <td><input value={item.desc} onChange={e => updateItem(i, 'desc', e.target.value)} /></td>
                             <td><input value={item.hsn} onChange={e => updateItem(i, 'hsn', e.target.value)} /></td>
-                            <td><input type="number" value={item.qty} min={0} step={0.01} onChange={e => updateItem(i, 'qty', parseFloat(e.target.value) || 0)} /></td>
-                            <td><input type="number" value={item.rate} min={0} step={0.01} onChange={e => updateItem(i, 'rate', parseFloat(e.target.value) || 0)} /></td>
+                            <td><input type="number" value={item.qty} min={0} step={0.01}
+                              onFocus={e => e.target.select()}
+                              onChange={e => { const v = e.target.value; updateItem(i, 'qty', v === '' ? '' : (parseFloat(v) || 0)) }}
+                              onBlur={e => { if (e.target.value === '') updateItem(i, 'qty', 0) }} /></td>
+                            <td><input type="number" value={item.rate} min={0} step={0.01}
+                              onFocus={e => e.target.select()}
+                              onChange={e => { const v = e.target.value; updateItem(i, 'rate', v === '' ? '' : (parseFloat(v) || 0)) }}
+                              onBlur={e => { if (e.target.value === '') updateItem(i, 'rate', 0) }} /></td>
                             <td>
                               <select value={item.gstRate} onChange={e => updateItem(i, 'gstRate', parseFloat(e.target.value))}>
                                 {[0, 3, 5, 12, 18, 28].map(r => <option key={r} value={r}>{r}%</option>)}
