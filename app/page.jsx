@@ -28,11 +28,13 @@ const DEFAULT_BILLED_BY = {
   bank: 'PUNJAB NATIONAL BANK | A/C: ARUP TIMSINA | A/C No: 2051202100001172 | IFSC: PUNB0205120',
 }
 
+// Billed To (Client) — har invoice me client alag ho sakta hai,
+// isliye koi preset nahi; har baar blank se start hoga.
 const DEFAULT_BILLED_TO = {
-  name: 'Dy SP HQ Biswanath',
-  address: 'Office of the Superintendent of Police, Biswanath District, Biswanath Chariali, Assam - 784176',
+  name: '',
+  address: '',
   gstin: '',
-  state: 'Assam, India',
+  state: '',
 }
 
 // Items start empty — user adds via "＋ Add Item" (no preset item)
@@ -113,6 +115,7 @@ export default function InvoicePage() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [billedByOpen, setBilledByOpen] = useState(false)
+  const [billedBySaving, setBilledBySaving] = useState(false)
 
   // Billed By
   const [billedBy, setBilledBy] = useState(DEFAULT_BILLED_BY)
@@ -187,6 +190,15 @@ export default function InvoicePage() {
         if (!cancelled) setStorageConnected(!!s.connected)
       } catch {}
       if (!cancelled) setStorageChecking(false)
+    })()
+    // Billed By: database me saved hai to wahi lao
+    // (☰ sidebar se update hota hai — code kholne ki zaroorat nahi)
+    ;(async () => {
+      try {
+        const r = await fetch('/api/settings/billed-by')
+        const s = await r.json()
+        if (!cancelled && s.billedBy) setBilledBy(b => ({ ...b, ...s.billedBy }))
+      } catch {}
     })()
     return () => { cancelled = true }
   }, [])
@@ -434,6 +446,25 @@ export default function InvoicePage() {
       showToast('Disconnect fail: ' + e.message, 'error')
     } finally {
       setStorageBusy(false)
+    }
+  }
+
+  // ── Billed By → database save (☰ sidebar se, code khole bina) ──
+  async function saveBilledBy() {
+    setBilledBySaving(true)
+    try {
+      const res = await fetch('/api/settings/billed-by', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billedBy }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'save fail')
+      showToast('✅ Billed By database me save ho gaya', 'success')
+    } catch (e) {
+      showToast('❌ Save nahi hua: ' + e.message, 'error')
+    } finally {
+      setBilledBySaving(false)
     }
   }
 
@@ -687,6 +718,10 @@ export default function InvoicePage() {
                   <label>Bank Details</label>
                   <input value={billedBy.bank} onChange={e => setBilledBy(p => ({ ...p, bank: e.target.value }))} />
                   </div>
+                <button className="btn btn-primary" disabled={billedBySaving} onClick={saveBilledBy} style={{ marginTop: 6 }}>
+                  {billedBySaving ? '⏳ Saving...' : '💾 Database me Save karo'}
+                </button>
+                <div className="settings-note">Ye details database me save hongi — har device par same dikhengi, code kholne ki zaroorat nahi.</div>
               </div>
             </div>
           </div>
