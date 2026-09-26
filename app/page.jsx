@@ -600,44 +600,80 @@ export default function InvoicePage() {
                 <button className="modal-close" onClick={() => setSettingsOpen(false)} aria-label="Close">✕</button>
               </div>
               <div className="modal-body">
-                {/* STORAGE BY ISWAR */}
-                <h3 className="settings-section">☁️ Storage by Iswar</h3>
-                {storageChecking ? (
-                  <div style={{ fontSize: '0.9rem', color: '#666' }}>⏳ Connection check ho raha hai...</div>
-                ) : storageConnected ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '1.6rem' }}>✅</span>
-                    <div style={{ flex: 1, minWidth: 180 }}>
-                      <div style={{ fontWeight: 600 }}>Connected</div>
-                      <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                        Print dabate hi PDF tumhare Storage by Iswar par auto-save hoga.
-                      </div>
-                    </div>
-                    <button className="btn btn-outline" disabled={storageBusy} onClick={disconnectStorage}>
-                      {storageBusy ? '⏳...' : 'Disconnect'}
-                    </button>
+                {/* ── STORAGE CARD ── */}
+                <div className="settings-card">
+                  <div className="settings-card-head">
+                    <span className="settings-card-icon">☁️</span>
+                    <h3>Storage by Iswar</h3>
+                    {storageConnected && <span className="settings-badge">Connected</span>}
                   </div>
-                ) : (
-                  <div>
-                    <div style={{ fontSize: '0.9rem', color: '#555', marginBottom: 10 }}>
-                      Apne <strong>Storage by Iswar</strong> app me <strong>Settings → Your personal API key</strong> se
-                      key copy karo aur yahan paste karke Connect dabao — phir har Print par invoice ka PDF
-                      tumhare storage par khud save ho jayega.
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <input
-                        type="password"
-                        placeholder="Personal API key yahan paste karo"
-                        value={storageKeyInput}
-                        onChange={e => setStorageKeyInput(e.target.value)}
-                        style={{ flex: 1, minWidth: 200 }}
-                      />
-                      <button className="btn btn-primary" disabled={storageBusy} onClick={connectStorage}>
-                        {storageBusy ? '⏳...' : '🔗 Connect'}
+                  {storageChecking ? (
+                    <div className="settings-note">⏳ Checking...</div>
+                  ) : storageConnected ? (
+                    <div className="storage-row">
+                      <span className="settings-note">Print par PDF auto-save hoga.</span>
+                      <button className="btn btn-outline" disabled={storageBusy} onClick={disconnectStorage}>
+                        {storageBusy ? '⏳...' : 'Disconnect'}
                       </button>
                     </div>
+                  ) : (
+                    <>
+                      <div className="settings-note" style={{ marginBottom: 10 }}>
+                        Storage app → <strong>Settings → Your personal API key</strong> se key copy karke yahan paste karo.
+                      </div>
+                      <div className="storage-row">
+                        <input
+                          type="password"
+                          placeholder="API key"
+                          value={storageKeyInput}
+                          onChange={e => setStorageKeyInput(e.target.value)}
+                          style={{ flex: 1, minWidth: 180 }}
+                        />
+                        <button className="btn btn-primary" disabled={storageBusy} onClick={connectStorage}>
+                          {storageBusy ? '⏳...' : '🔗 Connect'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* ── BILLED BY CARD ── */}
+                <div className="settings-card">
+                  <div className="settings-card-head">
+                    <span className="settings-card-icon">🏢</span>
+                    <h3>Billed By (Seller)</h3>
                   </div>
-                )}
+                  <div className="grid2">
+                    <div className="field col-span2">
+                      <label>Business Name</label>
+                      <input value={billedBy.name} onChange={e => setBilledBy(p => ({ ...p, name: e.target.value }))} />
+                    </div>
+                    <div className="field col-span2">
+                      <label>Address</label>
+                      <textarea value={billedBy.address} onChange={e => setBilledBy(p => ({ ...p, address: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>GSTIN</label>
+                      <input value={billedBy.gstin} onChange={e => setBilledBy(p => ({ ...p, gstin: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>PAN</label>
+                      <input value={billedBy.pan} onChange={e => setBilledBy(p => ({ ...p, pan: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>Email</label>
+                      <input value={billedBy.email} onChange={e => setBilledBy(p => ({ ...p, email: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>Phone</label>
+                      <input value={billedBy.phone} onChange={e => setBilledBy(p => ({ ...p, phone: e.target.value }))} />
+                    </div>
+                    <div className="field col-span2">
+                      <label>Bank Details</label>
+                      <input value={billedBy.bank} onChange={e => setBilledBy(p => ({ ...p, bank: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -655,40 +691,6 @@ export default function InvoicePage() {
         {/* ══ EDITOR TAB ══ */}
         {tab === 'editor' && (
           <>
-            {/* BILLED BY */}
-            <CollapsibleCard icon="🏢" title="Billed By (Seller)">
-                <div className="grid2">
-                  <div className="field col-span2">
-                    <label>Business Name</label>
-                    <input value={billedBy.name} onChange={e => setBilledBy(p => ({ ...p, name: e.target.value }))} />
-                  </div>
-                  <div className="field col-span2">
-                    <label>Address</label>
-                    <textarea value={billedBy.address} onChange={e => setBilledBy(p => ({ ...p, address: e.target.value }))} />
-                  </div>
-                  <div className="field">
-                    <label>GSTIN</label>
-                    <input value={billedBy.gstin} onChange={e => setBilledBy(p => ({ ...p, gstin: e.target.value }))} />
-                  </div>
-                  <div className="field">
-                    <label>PAN</label>
-                    <input value={billedBy.pan} onChange={e => setBilledBy(p => ({ ...p, pan: e.target.value }))} />
-                  </div>
-                  <div className="field">
-                    <label>Email</label>
-                    <input value={billedBy.email} onChange={e => setBilledBy(p => ({ ...p, email: e.target.value }))} />
-                  </div>
-                  <div className="field">
-                    <label>Phone</label>
-                    <input value={billedBy.phone} onChange={e => setBilledBy(p => ({ ...p, phone: e.target.value }))} />
-                  </div>
-                  <div className="field col-span2">
-                    <label>Bank Details</label>
-                    <input value={billedBy.bank} onChange={e => setBilledBy(p => ({ ...p, bank: e.target.value }))} />
-                  </div>
-                </div>
-            </CollapsibleCard>
-
             {/* INVOICE DETAILS */}
             <CollapsibleCard icon="📄" title="Invoice Details" defaultOpen={true}>
 
