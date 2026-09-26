@@ -132,6 +132,7 @@ export default function InvoicePage() {
   const [dbSync, setDbSync] = useState(false) // true = counter DB se synced hai
   const [counterLoading, setCounterLoading] = useState(true) // DB se number aane tak skeleton
   const [counterDirty, setCounterDirty] = useState(false) // user ne number manually badla
+  const [counterPushing, setCounterPushing] = useState(false) // manual number DB par push ho raha
   const [invDate, setInvDate] = useState(toISOLocal(new Date()))
   const [dueDate, setDueDate] = useState('')
   const [countrySupply, setCountrySupply] = useState('India')
@@ -302,6 +303,27 @@ export default function InvoicePage() {
   }
 
   // ── DB se counter dobara sync karo ──
+  // ── Manual number DB par set karo (test reset ka jugaad) ──
+  async function pushCounterToDb() {
+    setCounterPushing(true)
+    try {
+      const res = await fetch('/api/counter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', prefix: invPrefix, num: invNum, pad: invPad }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'fail')
+      setCounterDirty(false)
+      setDbSync(true)
+      showToast(`Counter DB me set — agla number: ${invNo}`, 'success')
+    } catch (e) {
+      showToast('Counter set fail: ' + e.message, 'error')
+    } finally {
+      setCounterPushing(false)
+    }
+  }
+
   async function resyncCounter() {
     try {
       const res = await fetch('/api/counter')
@@ -839,6 +861,11 @@ export default function InvoicePage() {
                     <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Last saved:</span>
                     <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.78rem', color: 'var(--ink)', background: '#fff', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px' }}>{lastSavedNo}</span>
                     <button className="btn btn-outline" style={{ padding: '4px 10px', fontSize: '0.75rem' }} onClick={resyncCounter}>↻ DB Sync {dbSync ? '🟢' : '🟠'}</button>
+                    {counterDirty && (
+                      <button className="btn btn-accent" style={{ padding: '4px 10px', fontSize: '0.75rem' }} disabled={counterPushing} onClick={pushCounterToDb}>
+                        {counterPushing ? '⏳...' : '💾 DB par set karo'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
