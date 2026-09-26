@@ -14,7 +14,18 @@ const MANUAL_LAST_NUM = 66
 async function ensureCounter(db) {
   const ref = db.collection('counters').doc(COUNTER_ID)
   const snap = await ref.get()
-  if (snap.exists) return snap.data()
+
+  // Doc pehle se hai par 66 se neeche hai (purane deploy ne 0 par seed kar diya tha)
+  // → khud 66 par lao taaki 67 se start ho. (66 tak ke bill user ne manually kar liye hain,
+  // isliye counter kabhi 66 se neeche nahi hona chahiye.)
+  if (snap.exists) {
+    const data = snap.data()
+    if ((data.last_num || 0) < MANUAL_LAST_NUM) {
+      await ref.update({ last_num: MANUAL_LAST_NUM, updated_at: new Date().toISOString() })
+      return { ...data, last_num: MANUAL_LAST_NUM }
+    }
+    return data
+  }
 
   let maxNum = MANUAL_LAST_NUM
   const invSnap = await db.collection('invoices').orderBy('invoice_no', 'desc').limit(100).get()
