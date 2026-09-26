@@ -664,20 +664,35 @@ export default function InvoicePage() {
   // ── Print ─────────────────────────────────────────────────
   // Pehle invoice ka PDF banao → Storage by Iswar par save karo → phir print dialog
   async function generatePdfBlob() {
-    const html2pdf = (await import('html2pdf.js')).default
+    // NOTE: html2pdf.js is intentionally NOT used here. It clones the source node
+    // into its own container, and an absolutely-positioned source makes that
+    // container collapse to height 0 -> html2canvas renders an empty canvas ->
+    // blank PDF in Storage. Direct html2canvas + jsPDF avoids the clone entirely.
+    const html2canvas = (await import('html2canvas')).default
+    const { jsPDF } = await import('jspdf')
     const el = document.createElement('div')
     el.innerHTML = printHTML
-    // NOTE: position:absolute (fixed NAHI) — html2canvas fixed elements ko viewport se bahar blank render karta hai
     el.style.cssText = 'position:absolute;left:-10000px;top:0;width:794px;display:block;box-sizing:border-box;background:#ffffff;padding:36px;'
     document.body.appendChild(el)
     try {
-      const blob = await html2pdf().set({
-        margin: 10,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      }).from(el).output('blob')
-      return blob
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+      const M = 10, pageW = 210 - M * 2, pageH = 297 - M * 2
+      const pxPerMm = canvas.width / pageW
+      const pagePxH = Math.floor(pageH * pxPerMm)
+      let rendered = 0, first = true
+      while (rendered < canvas.height) {
+        const sliceH = Math.min(pagePxH, canvas.height - rendered)
+        const page = document.createElement('canvas')
+        page.width = canvas.width
+        page.height = sliceH
+        page.getContext('2d').drawImage(canvas, 0, rendered, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
+        if (!first) pdf.addPage()
+        pdf.addImage(page.toDataURL('image/jpeg', 0.95), 'JPEG', M, M, pageW, sliceH / pxPerMm)
+        first = false
+        rendered += sliceH
+      }
+      return pdf.output('blob')
     } finally {
       document.body.removeChild(el)
     }
