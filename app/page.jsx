@@ -570,12 +570,12 @@ export default function InvoicePage() {
 
       {/* ── MAIN APP ── */}
       <div className="app no-print">
-        <div className="app-header">
-          <button className="icon-btn hamburger-btn" onClick={() => setBilledByOpen(true)} title="Billed By (Seller)" aria-label="Menu">
+        {/* ── STICKY TOP BAR ── */}
+        <div className="topbar">
+          <button className="icon-btn" onClick={() => setBilledByOpen(true)} title="Billed By (Seller)" aria-label="Menu">
             ☰
           </button>
           <h1>⚡ Invoice Generator</h1>
-          <p>M/S Arup Enterprise · GST Invoice with Supabase</p>
           {/* ── Profile (Google style) : menu → Settings → Storage connect ── */}
           <div className="profile-wrap">
             <button className="profile-btn" onClick={() => setProfileOpen(o => !o)} title="Profile" aria-label="Profile menu">

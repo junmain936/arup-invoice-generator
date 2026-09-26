@@ -25,18 +25,17 @@ body {
 /* ── APP ── */
 .app { max-width: 960px; margin: 0 auto; }
 
-.app-header { position: relative; text-align: center; margin-bottom: 28px; }
-.app-header h1 { font-family: 'DM Serif Display', serif; font-size: 2rem; color: var(--ink); letter-spacing: -0.5px; }
-.app-header p { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+/* ── STICKY TOP BAR (scroll nahi hoga) ── */
+.topbar { position: sticky; top: 0; z-index: 1500; display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; gap: 8px; padding: 10px 12px; margin: -24px -16px 24px; background: rgba(250, 249, 246, 0.96); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1.5px solid var(--border); }
+.topbar h1 { font-family: 'DM Serif Display', serif; font-size: 1.25rem; color: var(--ink); letter-spacing: -0.5px; text-align: center; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ── PROFILE (Google style, top-right) ── */
-.profile-wrap { position: absolute; top: 2px; right: 2px; }
+/* ── PROFILE (Google style, top-bar right) ── */
+.profile-wrap { position: relative; display: flex; justify-content: flex-end; }
 .profile-btn { position: relative; width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer; padding: 0; background: transparent; }
 .profile-avatar { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent2), var(--accent)); color: var(--ink); font-weight: 700; font-size: 1.1rem; font-family: 'DM Sans', sans-serif; box-shadow: 0 2px 8px rgba(200,150,62,0.4); border: 2px solid #fff; }
 /* Header icon button — circular */
 .icon-btn { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--paper); font-size: 1.15rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 .icon-btn:hover { border-color: var(--accent); }
-.hamburger-btn { position: absolute; top: 2px; left: 2px; }
 .profile-btn:hover .profile-avatar { box-shadow: 0 3px 12px rgba(0,0,0,0.28); }
 .profile-dot { position: absolute; bottom: 1px; right: 1px; width: 11px; height: 11px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
 .menu-scrim { position: fixed; inset: 0; z-index: 60; background: transparent; }
@@ -45,7 +44,7 @@ body {
 .menu-item:hover { background: var(--cream); }
 
 /* ── SETTINGS MODAL ── */
-.modal-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(30, 22, 14, 0.5); display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px 16px; }
+.modal-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(30, 22, 14, 0.5); display: flex; align-items: flex-start; justify-content: center; padding: 60px 16px 16px; }
 .modal-panel { width: 100%; max-width: 520px; max-height: calc(100vh - 110px); display: flex; flex-direction: column; background: var(--paper); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.25); overflow: hidden; }
 .modal-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1.5px solid var(--border); }
 .modal-head h2 { font-size: 1.15rem; color: var(--ink); margin: 0; }
@@ -62,7 +61,7 @@ body {
 .settings-card-body { padding: 0 16px 16px; border-top: 1px solid var(--border); padding-top: 14px; margin: 0 0; }
 .settings-badge { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em; color: #15803d; background: #dcfce7; border: 1px solid #bbf7d0; padding: 3px 10px; border-radius: 999px; }
 /* ── BILLED BY SIDEBAR (slide-in, left) ── */
-.sidebar-overlay { position: fixed; inset: 0; z-index: 70; background: rgba(30, 22, 14, 0.5); }
+.sidebar-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(30, 22, 14, 0.5); }
 .sidebar-panel { position: absolute; top: 0; left: 0; height: 100%; width: min(420px, 94vw); background: var(--paper); border-right: 1.5px solid var(--border); box-shadow: 12px 0 40px rgba(0,0,0,0.22); display: flex; flex-direction: column; animation: sidebarIn 0.25s ease-out; }
 @keyframes sidebarIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 .sidebar-head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1.5px solid var(--border); }
@@ -235,7 +234,8 @@ tbody td input:focus, tbody td select:focus { border-color: var(--accent); backg
 /* ── MOBILE ── */
 @media(max-width:600px) {
   body { padding: 12px 10px; }
-  .app-header h1 { font-size: 1.5rem; }
+  .topbar { margin: -12px -10px 20px; }
+  .topbar h1 { font-size: 1.1rem; }
   .grid2, .grid3 { grid-template-columns: 1fr; }
   .col-span2, .col-span3 { grid-column: span 1; }
   .card-body { padding: 14px; }
