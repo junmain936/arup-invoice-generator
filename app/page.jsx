@@ -104,6 +104,17 @@ function fmt(cur, v) {
 // ── LS KEY ────────────────────────────────────────────────────
 const LS_KEY = 'arup_inv_counter'
 
+// ── DRAFT — naya invoice type karte waqt auto-save (sirf localStorage, DB bilkul nahi) ──
+// Refresh ya browser close par data nahi udega. Print ke baad draft clear ho jata hai.
+const DRAFT_KEY = 'arup-invoice-draft-v1'
+function loadDraft() {
+  if (typeof window === 'undefined') return null
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY))
+    return d && typeof d === 'object' ? d : null
+  } catch { return null }
+}
+
 // ══════════════════════════════════════════════════════════════
 export default function InvoicePage() {
   // Tabs: editor | preview | history
@@ -270,17 +281,56 @@ export default function InvoicePage() {
     loadBilledByState()
   }, [loadCounterState, loadStorageState, loadBilledByState])
 
-  // ── TEMP (testing): sab kuch ek tap me refresh — counter + history + billed-by + storage ──
-  const [refreshing, setRefreshing] = useState(false)
-  async function refreshAll() {
-    if (refreshing) return
-    setRefreshing(true)
-    try {
-      await Promise.all([loadCounterState(), loadStorageState(), loadBilledByState(), loadHistory()])
-      showToast('🔄 Sab kuch refresh ho gaya', 'success')
-    } finally {
-      setRefreshing(false)
-    }
+  // ── DRAFT restore — mount par ek baar (refresh/browser-close ke baad wapas) ──
+  useEffect(() => {
+    const d = loadDraft()
+    if (!d) return
+    if (d.billedTo) setBilledTo({ ...DEFAULT_BILLED_TO, ...d.billedTo })
+    if (Array.isArray(d.items) && d.items.length) setItems(d.items)
+    if (typeof d.invDate === 'string' && d.invDate) setInvDate(d.invDate)
+    if (typeof d.dueDate === 'string') setDueDate(d.dueDate)
+    if (d.countrySupply) setCountrySupply(d.countrySupply)
+    if (d.placeSupply) setPlaceSupply(d.placeSupply)
+    if (d.currency) setCurrency(d.currency)
+    if (d.gstType) setGstType(d.gstType)
+    if (d.roundType) setRoundType(d.roundType)
+    if (d.datePreset) setDatePreset(d.datePreset)
+    const hasContent = (d.billedTo?.name || d.billedTo?.address || d.billedTo?.state) || (d.items?.length > 0)
+    if (hasContent) showToast('📝 Pichla draft wapas aa gaya', 'info')
+  }, [])
+
+  // ── DRAFT auto-save — har change ke 400ms baad (debounced, sirf localStorage) ──
+  const draftEpoch = useRef(0)
+  useEffect(() => {
+    const epoch = draftEpoch.current
+    const t = setTimeout(() => {
+      if (epoch !== draftEpoch.current) return // beech me clear ho gaya
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          billedTo, items, invDate, dueDate, countrySupply, placeSupply,
+          currency, gstType, roundType, datePreset, savedAt: Date.now(),
+        }))
+      } catch {}
+    }, 400)
+    return () => clearTimeout(t)
+  }, [billedTo, items, invDate, dueDate, countrySupply, placeSupply, currency, gstType, roundType, datePreset])
+
+  // ── Print ke baad form khaali + draft clear (naya invoice fresh shuru) ──
+  function clearForm() {
+    draftEpoch.current++ // pending auto-save cancel
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
+    setBilledTo(DEFAULT_BILLED_TO)
+    setItems([])
+    setInvDate(toISOLocal(new Date()))
+    setDueDate('')
+    setCountrySupply('India')
+    setPlaceSupply('Assam (18)')
+    setCurrency('₹')
+    setGstType('intra')
+    setRoundType('nearest')
+    setDatePreset('today')
+    setSavedInvoice(null)
+    setFieldErrors({})
   }
 
   // ── Print ke baad auto-next: DB se agla number lao ──
@@ -300,6 +350,7 @@ export default function InvoicePage() {
         setInvNum(n => n + 1) // DB nahi mila to local +1
         showToast('🖨️ Print ho gaya — agla number (local)', 'info')
       }
+      clearForm() // print ho gaya → form khaali + draft clear (naya invoice fresh)
     }
     window.addEventListener('afterprint', onAfterPrint)
     return () => window.removeEventListener('afterprint', onAfterPrint)
@@ -868,9 +919,6 @@ export default function InvoicePage() {
                 <div className="profile-menu">
                   <button className="menu-item" onClick={() => { setProfileOpen(false); setSettingsOpen(true); }}>
                     ⚙️ Settings
-                  </button>
-                  <button className="menu-item" onClick={() => { setProfileOpen(false); refreshAll(); }} disabled={refreshing} title="TEMP — testing ke liye">
-                    {refreshing ? '⏳ Refresh ho raha...' : '🔄 TEMP: Sab refresh karo'}
                   </button>
                 </div>
               </>
