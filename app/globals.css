@@ -104,6 +104,26 @@ body {
 }
 .field input::placeholder, .field textarea::placeholder { color: #b3afa3; }
 .field textarea { resize: vertical; min-height: 60px; max-height: 132px; }
+
+/* ── Missing required field — print dabane par red highlight ── */
+.field input.field-error, .field textarea.field-error,
+tbody td input.field-error {
+  border: 1.5px solid #ef4444 !important;
+  background: #fef2f2 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+  animation: err-pulse 1s ease-in-out 2;
+}
+.btn.field-error-btn {
+  border: 1.5px dashed #ef4444 !important;
+  color: #dc2626 !important;
+  animation: err-pulse 1s ease-in-out 2;
+}
+@keyframes err-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14); }
+  50% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0.25); }
+}
+/* Print button disabled LOOK (par tap hoga taaki missing fields red dikh sake) */
+.btn.btn-look-disabled { opacity: 0.5; }
 /* Settings card ke inputs (API key wagera) — wahi professional look */
 .settings-card-body input[type="password"], .settings-card-body input[type="text"] {
   background: #fff; border: 1px solid #d8d4c8; border-radius: 10px;

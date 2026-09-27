@@ -178,6 +178,43 @@ export default function InvoicePage() {
     items.every(it => (it.desc || '').trim() !== '' && Number(it.qty) > 0 && Number(it.rate) > 0)
   const savePrintHint = canSavePrint ? '' : 'Saare required fields bharo (GSTIN / HSN optional hai)'
 
+  // ── Missing required fields — print dabane par red highlight ke liye ──
+  const [fieldErrors, setFieldErrors] = useState({})
+  function getMissingFields() {
+    const miss = []
+    if (!(billedTo.name || '').trim()) miss.push({ key: 'to-name', label: 'Client Name' })
+    if (!(billedTo.address || '').trim()) miss.push({ key: 'to-address', label: 'Address' })
+    if (!(billedTo.state || '').trim()) miss.push({ key: 'to-state', label: 'State' })
+    if (items.length === 0) miss.push({ key: 'items-empty', label: 'koi Item nahi' })
+    items.forEach((it, i) => {
+      if (!(it.desc || '').trim()) miss.push({ key: `item-${i}-desc`, label: `Item ${i + 1}: description` })
+      if (!(Number(it.qty) > 0)) miss.push({ key: `item-${i}-qty`, label: `Item ${i + 1}: qty` })
+      if (!(Number(it.rate) > 0)) miss.push({ key: `item-${i}-rate`, label: `Item ${i + 1}: rate` })
+    })
+    return miss
+  }
+  function clearFieldErr(key) {
+    setFieldErrors(prev => {
+      if (!prev[key]) return prev
+      const n = { ...prev }
+      delete n[key]
+      return n
+    })
+  }
+  // Print button disabled DIKHEGA par tap hoga — missing fields red + scroll
+  function handlePrintTap() {
+    if (canSavePrint) { setFieldErrors({}); handlePrint(); return }
+    const miss = getMissingFields()
+    const errs = {}
+    miss.forEach(m => { errs[m.key] = true })
+    setFieldErrors(errs)
+    const names = miss.slice(0, 3).map(m => m.label).join(', ')
+    showToast(`❌ Pehle ye bharo: ${names}${miss.length > 3 ? ` (+${miss.length - 3} aur)` : ''}`, 'error')
+    setTimeout(() => {
+      document.querySelector('[data-err="1"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 80)
+  }
+
   // ── Load counter: pehle DB se, fail ho to localStorage fallback ──
   // ── DB se state lao — mount par, TEMP refresh button se, aur delete ke baad ──
   const loadCounterState = useCallback(async () => {
@@ -292,6 +329,7 @@ export default function InvoicePage() {
       next[i] = { ...next[i], [key]: val }
       return next
     })
+    clearFieldErr(`item-${i}-${key}`) // red highlight hat jayega jaise hi user bharega
   }
 
   function addItem() {
@@ -1083,15 +1121,21 @@ export default function InvoicePage() {
             </CollapsibleCard>
 
             {/* BILLED TO */}
-            <CollapsibleCard icon="🏛️" title="Billed To (Client)">
+            <CollapsibleCard icon="🏛️" title="Billed To (Client)" defaultOpen={true}>
                 <div className="grid2">
                   <div className="field col-span2">
                     <label>Client / Organisation Name</label>
-                    <input value={billedTo.name} onChange={e => setBilledTo(p => ({ ...p, name: e.target.value }))} />
+                    <input value={billedTo.name}
+                      className={fieldErrors['to-name'] ? 'field-error' : ''}
+                      data-err={fieldErrors['to-name'] ? '1' : undefined}
+                      onChange={e => { setBilledTo(p => ({ ...p, name: e.target.value })); clearFieldErr('to-name') }} />
                   </div>
                   <div className="field col-span2">
                     <label>Address</label>
-                    <textarea value={billedTo.address} onChange={e => setBilledTo(p => ({ ...p, address: e.target.value }))} />
+                    <textarea value={billedTo.address}
+                      className={fieldErrors['to-address'] ? 'field-error' : ''}
+                      data-err={fieldErrors['to-address'] ? '1' : undefined}
+                      onChange={e => { setBilledTo(p => ({ ...p, address: e.target.value })); clearFieldErr('to-address') }} />
                   </div>
                   <div className="field">
                     <label>GSTIN (optional)</label>
@@ -1099,7 +1143,10 @@ export default function InvoicePage() {
                   </div>
                   <div className="field">
                     <label>State</label>
-                    <input value={billedTo.state} onChange={e => setBilledTo(p => ({ ...p, state: e.target.value }))} />
+                    <input value={billedTo.state}
+                      className={fieldErrors['to-state'] ? 'field-error' : ''}
+                      data-err={fieldErrors['to-state'] ? '1' : undefined}
+                      onChange={e => { setBilledTo(p => ({ ...p, state: e.target.value })); clearFieldErr('to-state') }} />
                   </div>
                 </div>
             </CollapsibleCard>
@@ -1133,13 +1180,20 @@ export default function InvoicePage() {
                         return (
                           <tr key={i}>
                             <td style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.8rem' }}>{i + 1}</td>
-                            <td><input value={item.desc} onChange={e => updateItem(i, 'desc', e.target.value)} /></td>
+                            <td><input value={item.desc}
+                              className={fieldErrors[`item-${i}-desc`] ? 'field-error' : ''}
+                              data-err={fieldErrors[`item-${i}-desc`] ? '1' : undefined}
+                              onChange={e => updateItem(i, 'desc', e.target.value)} /></td>
                             <td><input value={item.hsn} onChange={e => updateItem(i, 'hsn', e.target.value)} /></td>
                             <td><input type="number" value={item.qty} min={0} step={0.01}
+                              className={fieldErrors[`item-${i}-qty`] ? 'field-error' : ''}
+                              data-err={fieldErrors[`item-${i}-qty`] ? '1' : undefined}
                               onFocus={e => e.target.select()}
                               onChange={e => { const v = e.target.value; updateItem(i, 'qty', v === '' ? '' : (parseFloat(v) || 0)) }}
                               onBlur={e => { if (e.target.value === '') updateItem(i, 'qty', 0) }} /></td>
                             <td><input type="number" value={item.rate} min={0} step={0.01}
+                              className={fieldErrors[`item-${i}-rate`] ? 'field-error' : ''}
+                              data-err={fieldErrors[`item-${i}-rate`] ? '1' : undefined}
                               onFocus={e => e.target.select()}
                               onChange={e => { const v = e.target.value; updateItem(i, 'rate', v === '' ? '' : (parseFloat(v) || 0)) }}
                               onBlur={e => { if (e.target.value === '') updateItem(i, 'rate', 0) }} /></td>
@@ -1157,7 +1211,9 @@ export default function InvoicePage() {
                   </table>
                 </div>
                 <div className="btn-row">
-                  <button className="btn btn-outline" onClick={addItem}>＋ Add Item</button>
+                  <button className={`btn btn-outline${fieldErrors['items-empty'] ? ' field-error-btn' : ''}`}
+                    data-err={fieldErrors['items-empty'] ? '1' : undefined}
+                    onClick={() => { addItem(); clearFieldErr('items-empty') }}>＋ Add Item</button>
                 </div>
             </CollapsibleCard>
 
@@ -1307,13 +1363,13 @@ export default function InvoicePage() {
         {tab === 'editor' && (
           <>
             <button className="btn btn-primary" onClick={() => handleTabChange('preview')}>👁️ Preview</button>
-            <button className="btn btn-outline" disabled={!canSavePrint} title={savePrintHint} onClick={handlePrint}>🖨️ Print / PDF</button>
+            <button className={`btn btn-outline${canSavePrint ? '' : ' btn-look-disabled'}`} aria-disabled={!canSavePrint} title={savePrintHint} onClick={handlePrintTap}>🖨️ Print / PDF</button>
           </>
         )}
         {tab === 'preview' && (
           <>
             <button className="btn btn-outline" onClick={() => setTab('editor')}>← Editor</button>
-            <button className="btn btn-primary" disabled={!canSavePrint} title={savePrintHint} onClick={handlePrint}>🖨️ Print / PDF</button>
+            <button className={`btn btn-primary${canSavePrint ? '' : ' btn-look-disabled'}`} aria-disabled={!canSavePrint} title={savePrintHint} onClick={handlePrintTap}>🖨️ Print / PDF</button>
             {savedInvoice && (
               <button className="btn-del" style={{ padding: '10px 14px', fontSize: '1rem' }} title={`${savedInvoice.no} delete karo`} onClick={() => askDelete(savedInvoice.id, savedInvoice.no)}>🗑</button>
             )}
