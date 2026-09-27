@@ -179,59 +179,72 @@ export default function InvoicePage() {
   const savePrintHint = canSavePrint ? '' : 'Saare required fields bharo (GSTIN / HSN optional hai)'
 
   // ── Load counter: pehle DB se, fail ho to localStorage fallback ──
-  useEffect(() => {
-    let cancelled = false
-    async function loadCounter() {
-      try {
-        const res = await fetch('/api/counter')
-        if (!res.ok) throw new Error('counter api fail')
-        const c = await res.json()
-        if (cancelled) return
-        setInvPrefix(c.prefix)
-        setInvNum(c.next_num)
-        setInvPad(c.pad)
-        setDbSync(true)
-        setCounterDirty(false)
-        try { localStorage.setItem(LS_KEY, JSON.stringify({ prefix: c.prefix, num: c.next_num, pad: c.pad })) } catch {}
-        if (!cancelled) setCounterLoading(false)
-        return
-      } catch { /* DB nahi mila — neeche LS fallback */ }
+  // ── DB se state lao — mount par, TEMP refresh button se, aur delete ke baad ──
+  const loadCounterState = useCallback(async () => {
+    try {
+      const res = await fetch('/api/counter')
+      if (!res.ok) throw new Error('counter api fail')
+      const c = await res.json()
+      setInvPrefix(c.prefix)
+      setInvNum(c.next_num)
+      setInvPad(c.pad)
+      setDbSync(true)
+      setCounterDirty(false)
+      try { localStorage.setItem(LS_KEY, JSON.stringify({ prefix: c.prefix, num: c.next_num, pad: c.pad })) } catch {}
+    } catch {
       try {
         const s = JSON.parse(localStorage.getItem(LS_KEY))
-        if (s && !cancelled) {
+        if (s) {
           setInvPrefix(s.prefix)
           setInvNum(s.num)
           setInvPad(s.pad)
           setLastSavedNo(s.lastNo || '—')
         }
       } catch {}
-      if (!cancelled) setCounterLoading(false)
     }
-    loadCounter()
+    setCounterLoading(false)
+  }, [])
+
+  const loadStorageState = useCallback(async () => {
+    try {
+      const r = await fetch('/api/storage/status', { cache: 'no-store' })
+      const s = await r.json()
+      setStorageConnected(!!s.connected)
+      setStorageKeySaved(!!s.keySaved)
+    } catch {}
+    setStorageChecking(false)
+  }, [])
+
+  const loadBilledByState = useCallback(async () => {
+    try {
+      const r = await fetch('/api/settings/billed-by')
+      const s = await r.json()
+      if (s.billedBy) setBilledBy(b => ({ ...b, ...s.billedBy }))
+    } catch {}
+    setBilledByLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadCounterState()
     // Storage by Iswar connection status (hamesha fresh — cache nahi)
-    ;(async () => {
-      try {
-        const r = await fetch('/api/storage/status', { cache: 'no-store' })
-        const s = await r.json()
-        if (!cancelled) {
-          setStorageConnected(!!s.connected)
-          setStorageKeySaved(!!s.keySaved)
-        }
-      } catch {}
-      if (!cancelled) setStorageChecking(false)
-    })()
+    loadStorageState()
     // Billed By: database me saved hai to wahi lao
     // (☰ sidebar se update hota hai — code kholne ki zaroorat nahi)
-    ;(async () => {
-      try {
-        const r = await fetch('/api/settings/billed-by')
-        const s = await r.json()
-        if (!cancelled && s.billedBy) setBilledBy(b => ({ ...b, ...s.billedBy }))
-      } catch {}
-      if (!cancelled) setBilledByLoading(false)
-    })()
-    return () => { cancelled = true }
-  }, [])
+    loadBilledByState()
+  }, [loadCounterState, loadStorageState, loadBilledByState])
+
+  // ── TEMP (testing): sab kuch ek tap me refresh — counter + history + billed-by + storage ──
+  const [refreshing, setRefreshing] = useState(false)
+  async function refreshAll() {
+    if (refreshing) return
+    setRefreshing(true)
+    try {
+      await Promise.all([loadCounterState(), loadStorageState(), loadBilledByState(), loadHistory()])
+      showToast('🔄 Sab kuch refresh ho gaya', 'success')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   // ── Print ke baad auto-next: DB se agla number lao ──
   useEffect(() => {
@@ -434,7 +447,7 @@ export default function InvoicePage() {
   }
 
   // ── Storage upload (XHR — REAL upload % ke liye) ──
-  function uploadPdfBlob(blob, no, onProgress) {
+  function uploadPdfBlob(blob, no, onProgress, invoiceId) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open('POST', '/api/storage/upload')
@@ -450,6 +463,7 @@ export default function InvoicePage() {
       const fd = new FormData()
       fd.append('file', blob, `Invoice-${no}.pdf`)
       fd.append('invoice_no', no)
+      fd.append('invoice_id', invoiceId || '')
       xhr.send(fd)
     })
   }
@@ -478,7 +492,7 @@ export default function InvoicePage() {
         await uploadPdfBlob(blob, finalNo, up => {
           const pct = Math.round(60 + up * 36)
           setPrintProg({ pct, label: `Storage par upload ho raha... ${Math.round(up * 100)}%` })
-        })
+        }, saved.id)
         setPrintProg({ pct: 98, label: 'Storage par save ho gaya ✓' })
       } else {
         setPrintProg({ pct: 96, label: 'Storage connected nahi — seedha print hoga' })
@@ -579,10 +593,18 @@ export default function InvoicePage() {
     setPinBusy(true)
     try {
       const res = await fetch(`/api/invoice/${pinTarget.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Delete failed')
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || 'Delete failed')
       setHistory(prev => prev.filter(inv => inv.id !== pinTarget.id))
       if (savedInvoice?.id === pinTarget.id) setSavedInvoice(null)
-      showToast(`${pinTarget.no} deleted`, 'info')
+      let msg = `🗑 ${pinTarget.no} deleted`
+      if (d.numberFreed) {
+        msg += ` • number free (${d.numberFreed})`
+        loadCounterState() // display par agla number update karo
+      }
+      if (d.storage?.deleted) msg += ` • ${d.storage.note}`
+      else if (d.storage?.note) msg += ` • storage: ${d.storage.note}`
+      showToast(msg, 'info')
       setPinOpen(false)
       setPinTarget(null)
     } catch (e) {
@@ -808,6 +830,9 @@ export default function InvoicePage() {
                 <div className="profile-menu">
                   <button className="menu-item" onClick={() => { setProfileOpen(false); setSettingsOpen(true); }}>
                     ⚙️ Settings
+                  </button>
+                  <button className="menu-item" onClick={() => { setProfileOpen(false); refreshAll(); }} disabled={refreshing} title="TEMP — testing ke liye">
+                    {refreshing ? '⏳ Refresh ho raha...' : '🔄 TEMP: Sab refresh karo'}
                   </button>
                 </div>
               </>
